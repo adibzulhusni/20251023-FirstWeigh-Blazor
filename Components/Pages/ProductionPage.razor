@@ -1,0 +1,601 @@
+﻿@page "/production"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject IBatchService BatchService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<style>
+    .page-container {
+        padding: 32px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+        font-size: 14px;
+        color: #718096;
+    }
+
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 16px;
+    }
+
+    /* Active Batches Section */
+    .active-batches-section {
+        margin-bottom: 40px;
+    }
+
+    .batch-cards-container {
+        display: flex;
+        gap: 20px;
+        overflow-x: auto;
+        padding-bottom: 16px;
+    }
+
+        .batch-cards-container::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .batch-cards-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .batch-cards-container::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 4px;
+        }
+
+            .batch-cards-container::-webkit-scrollbar-thumb:hover {
+                background: #a0aec0;
+            }
+
+    .batch-card {
+        min-width: 320px;
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+
+        .batch-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .batch-card.pending {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-color: #e2e8f0;
+        }
+
+        .batch-card.inprogress {
+            background: linear-gradient(135deg, #bee3f8 0%, #90cdf4 100%);
+            border-color: #4299e1;
+        }
+
+        .batch-card.completed {
+            background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);
+            border-color: #48bb78;
+        }
+
+    .batch-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 16px;
+    }
+
+    .batch-code {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .batch-card.inprogress .batch-code,
+    .batch-card.completed .batch-code {
+        color: #1a202c;
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .batch-card.pending .status-badge {
+        background-color: #feebc8;
+        color: #7c2d12;
+    }
+
+    .batch-card.inprogress .status-badge {
+        background-color: rgba(255, 255, 255, 0.9);
+        color: #2c5282;
+    }
+
+    .batch-card.completed .status-badge {
+        background-color: rgba(255, 255, 255, 0.9);
+        color: #22543d;
+    }
+
+    .recipe-name {
+        font-size: 14px;
+        color: #4a5568;
+        margin-bottom: 12px;
+        font-weight: 500;
+    }
+
+    .batch-card.inprogress .recipe-name,
+    .batch-card.completed .recipe-name {
+        color: #2d3748;
+    }
+
+    .batch-info {
+        margin-bottom: 16px;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 13px;
+    }
+
+    .info-label {
+        color: #718096;
+        font-weight: 500;
+    }
+
+    .batch-card.inprogress .info-label,
+    .batch-card.completed .info-label {
+        color: #4a5568;
+    }
+
+    .info-value {
+        color: #2d3748;
+        font-weight: 600;
+        font-family: 'Roboto Mono', monospace;
+    }
+
+    .operator-name {
+        color: #2d3748;
+        font-weight: 600;
+    }
+
+    .progress-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .batch-card.inprogress .progress-section,
+    .batch-card.completed .progress-section {
+        border-top-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .progress-text {
+        font-size: 12px;
+        color: #718096;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .batch-card.inprogress .progress-text,
+    .batch-card.completed .progress-text {
+        color: #4a5568;
+    }
+
+    .progress-bar {
+        height: 8px;
+        background-color: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .batch-card.inprogress .progress-bar,
+    .batch-card.completed .progress-bar {
+        background-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4a9eff, #3a8ee6);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .batch-card.completed .progress-fill {
+        background: linear-gradient(90deg, #48bb78, #38a169);
+    }
+
+    /* All Batches Section */
+    .all-batches-section {
+        margin-top: 40px;
+    }
+
+    .table-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background-color: #f7fafc;
+    }
+
+    th {
+        padding: 16px;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    td {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+    }
+
+    tbody tr {
+        transition: background-color 0.2s;
+    }
+
+        tbody tr:hover {
+            background-color: #f7fafc;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+    .batch-code-text {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        color: #1a202c;
+    }
+
+    .status-badge-table {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .status-pending {
+        background-color: #feebc8;
+        color: #7c2d12;
+    }
+
+    .status-inprogress {
+        background-color: #bee3f8;
+        color: #2c5282;
+    }
+
+    .status-completed {
+        background-color: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-aborted {
+        background-color: #fed7d7;
+        color: #742a2a;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #718096;
+    }
+
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.3;
+    }
+
+    .empty-state-text {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-subtext {
+        font-size: 14px;
+        color: #a0aec0;
+    }
+
+    .loading-spinner {
+        text-align: center;
+        padding: 40px;
+        color: #718096;
+    }
+
+    .refresh-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #718096;
+        padding: 8px 16px;
+        background: #f7fafc;
+        border-radius: 6px;
+        margin-left: 16px;
+    }
+
+    .refresh-dot {
+        width: 8px;
+        height: 8px;
+        background: #48bb78;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.3;
+        }
+    }
+
+    @@media (max-width: 1024px) {
+        .page-container {
+            padding: 20px;
+        }
+
+        .batch-card {
+            min-width: 280px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .batch-card {
+            min-width: 260px;
+        }
+
+        .table-card {
+            overflow-x: auto;
+        }
+
+        table {
+            min-width: 800px;
+        }
+    }
+</style>
+
+<div class="page-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div style="display: flex; align-items: center;">
+            <h1 class="page-title">Production Overview</h1>
+            <span class="refresh-indicator">
+                <span class="refresh-dot"></span>
+                Auto-refresh every 5s
+            </span>
+        </div>
+        <p class="page-subtitle">Real-time monitoring of active production batches</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Loading production data...</div>
+    }
+    else
+    {
+        <!-- Active Batches Section -->
+        <div class="active-batches-section">
+            <h2 class="section-title">Active Batches (@activeBatches.Count / 5)</h2>
+
+            @if (!activeBatches.Any())
+            {
+                <div class="table-card">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🏭</div>
+                        <div class="empty-state-text">No active batches</div>
+                        <div class="empty-state-subtext">Start a pending batch to begin production</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="batch-cards-container">
+                    @foreach (var batch in activeBatches)
+                    {
+                        <div class="batch-card @GetStatusClass(batch.Status)" @onclick="() => NavigateToBatch(batch.BatchId)">
+                            <div class="batch-card-header">
+                                <span class="batch-code">@batch.BatchId</span>
+                                <span class="status-badge">@GetStatusDisplay(batch.Status)</span>
+                            </div>
+
+                            <div class="recipe-name">@batch.RecipeName</div>
+
+                            <div class="batch-info">
+                                <div class="info-row">
+                                    <span class="info-label">Repetitions:</span>
+                                    <span class="info-value">@batch.CurrentRepetition / @batch.TotalRepetitions</span>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(batch.StartedBy))
+                                {
+                                    <div class="info-row">
+                                        <span class="info-label">Operator:</span>
+                                        <span class="operator-name">@batch.StartedBy</span>
+                                    </div>
+                                }
+
+                                @if (batch.StartedDate.HasValue)
+                                {
+                                    <div class="info-row">
+                                        <span class="info-label">Started:</span>
+                                        <span class="info-value" style="font-size: 11px;">@batch.StartedDate.Value.ToString("HH:mm")</span>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="progress-section">
+                                <div class="progress-text">Progress: @batch.ProgressPercentage.ToString("F0")%</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: @batch.ProgressPercentage%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- All Batches Section -->
+        <div class="all-batches-section">
+            <h2 class="section-title">All Batches (@allBatches.Count)</h2>
+
+            <div class="table-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Batch Code</th>
+                            <th>Recipe</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Operator</th>
+                            <th>Created Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!allBatches.Any())
+                        {
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">📦</div>
+                                        <div class="empty-state-text">No batches found</div>
+                                        <div class="empty-state-subtext">Create your first batch to begin production</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var batch in allBatches)
+                            {
+                                <tr style="cursor: pointer;" @onclick="() => NavigateToBatch(batch.BatchId)">
+                                    <td><span class="batch-code-text">@batch.BatchId</span></td>
+                                    <td>@batch.RecipeName</td>
+                                    <td>
+                                        <span class="status-badge-table status-@GetStatusClass(batch.Status)">
+                                            @GetStatusDisplay(batch.Status)
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span style="font-family: 'Roboto Mono', monospace;">
+                                            @batch.CurrentRepetition / @batch.TotalRepetitions (@batch.ProgressPercentage.ToString("F0")%)
+                                        </span>
+                                    </td>
+                                    <td>@(string.IsNullOrEmpty(batch.StartedBy) ? "-" : batch.StartedBy)</td>
+                                    <td>@batch.CreatedDate.ToString("MMM dd, yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Batch> activeBatches = new();
+    private List<Batch> allBatches = new();
+    private bool isLoading = true;
+    private System.Threading.Timer? refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        StartAutoRefresh();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        // Load active batches (InProgress status)
+        activeBatches = await BatchService.GetActiveBatchesAsync();
+
+        // Load all batches, sorted by created date descending
+        allBatches = await BatchService.GetAllBatchesAsync();
+        allBatches = allBatches.OrderByDescending(b => b.CreatedDate).ToList();
+
+        isLoading = false;
+    }
+
+    private void StartAutoRefresh()
+    {
+        // Refresh every 5 seconds
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadData();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status.ToLower().Replace(" ", "");
+    }
+
+    private string GetStatusDisplay(string status)
+    {
+        return status == "InProgress" ? "In Progress" : status;
+    }
+
+    private void NavigateToBatch(string batchId)
+    {
+        // Navigate to batch management page with the batch selected
+        Navigation.NavigateTo($"/weighing/{batchId}");
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+}

@@ -1,0 +1,367 @@
+﻿@page "/users"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+<PageTitle>User Management</PageTitle>
+
+<div class="user-management-container">
+    <div class="page-header">
+        <h3>User Management</h3>
+        <div class="header-actions">
+            <button class="btn btn-success" @onclick="OpenAddUserModal">
+                <span class="icon">➕</span> Add New User
+            </button>
+            <button class="btn btn-primary" @onclick="CreateBackup">
+                <span class="icon">💾</span> Create Backup
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">
+            @successMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            @errorMessage
+        </div>
+    }
+
+    <div class="search-box">
+        <input type="text"
+               class="form-control"
+               placeholder="Search users..."
+               @bind="searchQuery"
+               @bind:event="oninput"
+               @onkeyup="FilterUsers" />
+    </div>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created Date</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (filteredUsers.Any())
+                {
+                    @foreach (var user in filteredUsers)
+                    {
+                        <tr>
+                            <td><code>@user.UserId</code></td>
+                            <td>@user.Username</td>
+                            <td>@user.FullName</td>
+                            <td>
+                                <span class="badge badge-@GetRoleBadgeClass(user.Role)">
+                                    @user.Role
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-@(user.IsActive ? "success" : "secondary")">
+                                    @(user.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td>@user.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@(user.LastLoginDate?.ToString("yyyy-MM-dd HH:mm") ?? "Never")</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning" @onclick="() => OpenEditUserModal(user)">
+                                    ✏️ Edit
+                                </button>
+                                <button class="btn btn-sm btn-danger"
+                                        @onclick="() => DeleteUser(user.UserId)"
+                                        disabled="@(user.Role == UserRoles.Admin && users.Count(u => u.Role == UserRoles.Admin) <= 1)">
+                                    🗑️ Delete
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="8" class="text-center">No users found</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* Add/Edit User Modal *@
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(isEditMode ? "Edit User" : "Add New User")</h4>
+                <button class="btn-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" class="form-control" @bind="currentUser.Username" />
+                </div>
+
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" class="form-control" @bind="currentUser.Password" />
+                </div>
+
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" class="form-control" @bind="currentUser.FullName" />
+                </div>
+
+                <div class="form-group">
+                    <label>Role *</label>
+                    <select class="form-control" @bind="currentUser.Role">
+                        @foreach (var role in UserRoles.GetAllRoles())
+                        {
+                            <option value="@role">@role</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" @bind="currentUser.IsActive" />
+                        Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveUser">
+                    @(isEditMode ? "Update" : "Create")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (showDeleteConfirm)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-content modal-sm" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>Confirm Delete</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this user?</p>
+                <p><strong>This action cannot be undone.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<User> users = new();
+    private List<User> filteredUsers = new();
+    private string searchQuery = string.Empty;
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private bool showModal = false;
+    private bool isEditMode = false;
+    private User currentUser = new();
+
+    private bool showDeleteConfirm = false;
+    private string userIdToDelete = string.Empty;
+
+    // TODO: Get from authentication
+    private string currentUsername = "admin";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = await UserService.GetAllUsersAsync();
+        filteredUsers = users;
+    }
+
+    private void FilterUsers()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredUsers = users;
+        }
+        else
+        {
+            var query = searchQuery.ToLower();
+            filteredUsers = users.Where(u =>
+                u.UserId.ToLower().Contains(query) ||
+                u.Username.ToLower().Contains(query) ||
+                u.FullName.ToLower().Contains(query) ||
+                u.Role.ToLower().Contains(query)
+            ).ToList();
+        }
+    }
+
+    private void OpenAddUserModal()
+    {
+        currentUser = new User
+        {
+            Role = UserRoles.Operator,
+            IsActive = true
+        };
+        isEditMode = false;
+        showModal = true;
+    }
+
+    private void OpenEditUserModal(User user)
+    {
+        currentUser = new User
+        {
+            UserId = user.UserId,
+            Username = user.Username,
+            Password = user.Password,
+            FullName = user.FullName,
+            Role = user.Role,
+            IsActive = user.IsActive,
+            CreatedDate = user.CreatedDate,
+            LastModifiedDate = user.LastModifiedDate,
+            LastModifiedBy = user.LastModifiedBy,
+            LastLoginDate = user.LastLoginDate
+        };
+        isEditMode = true;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        ClearMessages();
+    }
+
+    private async Task SaveUser()
+    {
+        ClearMessages();
+
+        // Validation
+        if (string.IsNullOrWhiteSpace(currentUser.Username) ||
+            string.IsNullOrWhiteSpace(currentUser.Password) ||
+            string.IsNullOrWhiteSpace(currentUser.FullName))
+        {
+            errorMessage = "Please fill in all required fields.";
+            return;
+        }
+
+        bool success;
+
+        if (isEditMode)
+        {
+            success = await UserService.UpdateUserAsync(currentUser, currentUsername);
+            successMessage = success ? "User updated successfully!" : "Failed to update user. Username may already exist.";
+        }
+        else
+        {
+            success = await UserService.AddUserAsync(currentUser, currentUsername);
+            successMessage = success ? "User created successfully!" : "Failed to create user. Username may already exist.";
+        }
+
+        if (success)
+        {
+            await LoadUsers();
+            CloseModal();
+            ClearMessagesAfterDelay();
+        }
+        else
+        {
+            errorMessage = isEditMode ? "Failed to update user." : "Failed to create user. Username may already exist.";
+        }
+    }
+
+    private void DeleteUser(string userId)
+    {
+        userIdToDelete = userId;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        userIdToDelete = string.Empty;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        var success = await UserService.DeleteUserAsync(userIdToDelete);
+
+        if (success)
+        {
+            successMessage = "User deleted successfully!";
+            await LoadUsers();
+        }
+        else
+        {
+            errorMessage = "Failed to delete user. Cannot delete the last admin.";
+        }
+
+        showDeleteConfirm = false;
+        userIdToDelete = string.Empty;
+        ClearMessagesAfterDelay();
+    }
+
+    private async Task CreateBackup()
+    {
+        ClearMessages();
+
+        try
+        {
+            var fileName = await UserService.CreateBackupAsync(currentUsername);
+            successMessage = $"Backup created successfully: {fileName}";
+            ClearMessagesAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to create backup: {ex.Message}";
+        }
+    }
+
+    private string GetRoleBadgeClass(string role)
+    {
+        return role switch
+        {
+            UserRoles.Admin => "primary",
+            UserRoles.Developer => "info",
+            UserRoles.Supervisor => "warning",
+            UserRoles.Operator => "secondary",
+            _ => "secondary"
+        };
+    }
+
+    private void ClearMessages()
+    {
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    private async void ClearMessagesAfterDelay()
+    {
+        await Task.Delay(5000);
+        ClearMessages();
+        StateHasChanged();
+    }
+}

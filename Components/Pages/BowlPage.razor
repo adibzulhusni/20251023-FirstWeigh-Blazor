@@ -1,0 +1,839 @@
+﻿@page "/bowls"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject BowlService BowlService
+@inject ModbusScaleService ModbusService
+@implements IDisposable
+
+<PageTitle>Bowl Management - Weighing Station</PageTitle>
+
+<style>
+    .bowl-weighing-container {
+        padding: 20px;
+        max-width: 1800px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+    .btn-primary {
+        background: #4a9eff;
+        color: white;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .alert {
+        padding: 14px 20px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .connection-status {
+        display: flex;
+        gap: 24px;
+        padding: 16px 24px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .status-label {
+        font-weight: 600;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+        .status-badge.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.reading {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .status-badge.stopped {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+    .scales-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .scale-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        padding: 24px;
+        border: 3px solid #e0e0e0;
+    }
+
+        .scale-card.active {
+            border-color: #4a9eff;
+            box-shadow: 0 4px 20px rgba(74, 158, 255, 0.3);
+        }
+
+    .scale-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .scale-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .scale-subtitle {
+        font-size: 14px;
+        color: #666;
+        margin-top: 4px;
+    }
+
+    .scale-status {
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .status-ready {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-offline {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .weight-display {
+        text-align: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        margin-bottom: 24px;
+    }
+
+    .weight-label {
+        font-size: 14px;
+        color: rgba(255,255,255,0.8);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+
+    .weight-value {
+        font-size: 56px;
+        font-weight: 700;
+        font-family: 'Roboto Mono', monospace;
+        color: white;
+        line-height: 1;
+    }
+
+    .weight-unit {
+        font-size: 24px;
+        font-weight: 400;
+        color: rgba(255,255,255,0.9);
+        margin-left: 8px;
+    }
+
+    .bowl-type-section {
+        margin-bottom: 24px;
+    }
+
+    .section-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #666;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .type-buttons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    .type-button {
+        padding: 16px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        font-weight: 600;
+        font-size: 15px;
+    }
+
+        .type-button:hover {
+            border-color: #4a9eff;
+            transform: translateY(-2px);
+        }
+
+        .type-button.selected {
+            background: #4a9eff;
+            color: white;
+            border-color: #4a9eff;
+        }
+
+    .scale-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn-tare {
+        background: #ffc107;
+        color: #333;
+        flex: 1;
+    }
+
+    .btn-save {
+        background: #28a745;
+        color: white;
+        flex: 2;
+        font-size: 16px;
+        padding: 14px 24px;
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .saved-bowls-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: #f8f9fa;
+    }
+
+    th {
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e0e0e0;
+        font-size: 14px;
+    }
+
+    tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .bowl-code {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        color: #d63384;
+        background: #f4f4f4;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    .badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+    }
+
+    .badge-regular {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .badge-mixing {
+        background: #cce5ff;
+        color: #004085;
+    }
+
+    .badge-type {
+        background: #e2e3e5;
+        color: #383d41;
+    }
+
+    .weight-cell {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+    }
+
+    @@media (max-width: 1200px) {
+        .scales-container {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="bowl-weighing-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Bowl Management - Weighing Station</h1>
+            <p style="color: #666; margin-top: 8px;">Weigh and register bowls using the scales below</p>
+        </div>
+        <div class="header-actions">
+            @if (!isReading)
+            {
+                <button class="btn btn-success" @onclick="StartReading">▶️ Start Reading</button>
+            }
+            else
+            {
+                <button class="btn btn-danger" @onclick="StopReading">⏸️ Stop Reading</button>
+            }
+            <button class="btn btn-secondary" @onclick="RefreshBowls">🔄 Refresh List</button>
+            <button class="btn btn-primary" @onclick="OpenExcelFile">📊 View All Bowls</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="connection-status">
+        <div class="status-item">
+            <span class="status-label">Scale 1:</span>
+            <span class="status-badge @(scale1Connected ? "connected" : "disconnected")">
+                @(scale1Connected ? "🟢 Connected" : "🔴 Disconnected")
+            </span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Scale 2:</span>
+            <span class="status-badge @(scale2Connected ? "connected" : "disconnected")">
+                @(scale2Connected ? "🟢 Connected" : "🔴 Disconnected")
+            </span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Reading:</span>
+            <span class="status-badge @(isReading ? "reading" : "stopped")">
+                @(isReading ? "📊 Active" : "⏸️ Stopped")
+            </span>
+        </div>
+    </div>
+
+    <div class="scales-container">
+        <div class="scale-card @(activeScale == 1 ? "active" : "")">
+            <div class="scale-header">
+                <div>
+                    <div class="scale-title">⚖️ SCALE 1</div>
+                    <div class="scale-subtitle">Regular Bowls (Small / Medium / Large)</div>
+                </div>
+                <span class="scale-status @(scale1Connected ? "status-ready" : "status-offline")">
+                    @(scale1Connected ? "Ready" : "Offline")
+                </span>
+            </div>
+
+            <div class="weight-display">
+                <div class="weight-label">Current Weight</div>
+                <div class="weight-value">
+                    @scale1Weight.ToString("0.000")<span class="weight-unit">kg</span>
+                </div>
+            </div>
+
+            <div class="bowl-type-section">
+                <div class="section-label">Select Bowl Type</div>
+                <div class="type-buttons">
+                    <button class="type-button @(scale1SelectedType == BowlType.Small ? "selected" : "")"
+                            @onclick='() => SelectType(1, BowlType.Small)'>
+                        🥣 Small
+                    </button>
+                    <button class="type-button @(scale1SelectedType == BowlType.Medium ? "selected" : "")"
+                            @onclick='() => SelectType(1, BowlType.Medium)'>
+                        🥣 Medium
+                    </button>
+                    <button class="type-button @(scale1SelectedType == BowlType.Large ? "selected" : "")"
+                            @onclick='() => SelectType(1, BowlType.Large)'>
+                        🥣 Large
+                    </button>
+                </div>
+            </div>
+
+             <div class="scale-actions">
+                @* <button class="btn btn-tare" @onclick="() => TareScale(1)" disabled="@(!isReading)">⚖️ Tare Scale</button> *@
+                <button class="btn btn-save"
+                        @onclick="() => SaveBowl(1)"
+                        disabled="@(scale1Weight <= 0 || string.IsNullOrEmpty(scale1SelectedType))">
+                    💾 Save Bowl
+                </button>
+            </div>
+        </div>
+
+        <div class="scale-card @(activeScale == 2 ? "active" : "")">
+            <div class="scale-header">
+                <div>
+                    <div class="scale-title">⚖️ SCALE 2</div>
+                    <div class="scale-subtitle">Mixing Bowls</div>
+                </div>
+                <span class="scale-status @(scale2Connected ? "status-ready" : "status-offline")">
+                    @(scale2Connected ? "Ready" : "Offline")
+                </span>
+            </div>
+
+            <div class="weight-display" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="weight-label">Current Weight</div>
+                <div class="weight-value">
+                    @scale2Weight.ToString("0.000")<span class="weight-unit">kg</span>
+                </div>
+            </div>
+
+            <div class="bowl-type-section">
+                <div class="section-label">Mixing Bowl (No Type Selection)</div>
+                <div style="padding: 20px; text-align: center; background: #f8f9fa; border-radius: 8px; color: #666;">
+                    <p style="margin: 0;">Mixing bowls are saved without a type classification.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 13px;">Simply weigh and save.</p>
+                </div>
+            </div>
+
+             <div class="scale-actions">
+              @*   <button class="btn btn-tare" @onclick="() => TareScale(2)" disabled="@(!isReading)">⚖️ Tare Scale</button> *@
+                <button class="btn btn-save"
+                        @onclick="() => SaveBowl(2)"
+                        disabled="@(scale2Weight <= 0)">
+                    💾 Save Mixing Bowl
+                </button>
+            </div> 
+        </div>
+    </div>
+
+    <div class="saved-bowls-section">
+        <div class="section-header">
+            <h3 class="section-title">Recently Saved Bowls</h3>
+            <span style="color: #666; font-size: 14px;">Total: @bowls.Count bowls</span>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bowl Code</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Weight (kg)</th>
+                        <th>Status</th>
+                        <th>Created Date</th>
+                        <th>Created By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (bowls.Any())
+                    {
+                        @foreach (var bowl in bowls.OrderByDescending(b => b.CreatedDate).Take(10))
+                        {
+                            <tr>
+                                <td><span class="bowl-code">@bowl.BowlCode</span></td>
+                                <td>
+                                    <span class="badge badge-@(bowl.Category == BowlCategory.MixingBowl ? "mixing" : "regular")">
+                                        @bowl.Category
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-type">@bowl.DisplayType</span>
+                                </td>
+                                <td class="weight-cell">@bowl.Weight.ToString("0.000")</td>
+                                <td>@bowl.Status</td>
+                                <td>@bowl.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@bowl.LastModifiedBy</td>
+                                <td>
+                                    <button class="btn btn-delete" @onclick="() => DeleteBowl(bowl.BowlId)">
+                                        🗑️ Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 40px; color: #999;">
+                                No bowls saved yet. Weigh a bowl using the scales above.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private decimal scale1Weight = 0m;
+    private decimal scale2Weight = 0m;
+    private string scale1SelectedType = string.Empty;
+    private int activeScale = 0;
+    private List<Bowl> bowls = new();
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    private string currentUser = "operator1";
+    private bool scale1Connected = false;
+    private bool scale2Connected = false;
+    private bool isReading = false;
+    private CancellationTokenSource? readingCancellation;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBowls();
+    }
+
+    private async Task StartReading()
+    {
+        ClearMessages();
+
+        if (!scale1Connected && !scale2Connected)
+        {
+            successMessage = "🔄 Connecting to PLC...";
+            StateHasChanged();
+
+            var connected = await ModbusService.ConnectAsync();
+
+            scale1Connected = ModbusService.Scale1Connected;
+            scale2Connected = ModbusService.Scale2Connected;
+
+            if (!scale1Connected && !scale2Connected)
+            {
+                errorMessage = "❌ Failed to connect to PLC. Check network and IP address.";
+                ClearMessageAfterDelay();
+                return;
+            }
+        }
+
+        ModbusService.WeightUpdated += OnWeightUpdated;
+        readingCancellation = new CancellationTokenSource();
+        isReading = true;
+
+        _ = ModbusService.StartReadingAsync(readingCancellation.Token);
+
+        successMessage = $"▶️ Started reading scales (Scale 1: {(scale1Connected ? "OK" : "Failed")}, Scale 2: {(scale2Connected ? "OK" : "Failed")})";
+        ClearMessageAfterDelay();
+    }
+
+    private void StopReading()
+    {
+        ClearMessages();
+        readingCancellation?.Cancel();
+        isReading = false;
+        ModbusService.WeightUpdated -= OnWeightUpdated;
+        successMessage = "⏸️ Stopped reading scales.";
+        ClearMessageAfterDelay();
+    }
+
+    private void OnWeightUpdated(decimal s1Weight, decimal s2Weight)
+    {
+        scale1Weight = s1Weight;
+        scale2Weight = s2Weight;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadBowls()
+    {
+        bowls = await BowlService.GetAllBowlsAsync();
+    }
+
+    private void SelectType(int scaleNumber, string type)
+    {
+        if (scaleNumber == 1)
+        {
+            scale1SelectedType = type;
+            activeScale = 1;
+        }
+    }
+
+    // private async Task TareScale(int scaleNumber)
+    // {
+    //     if (!isReading)
+    //     {
+    //         errorMessage = "⚠️ Start reading scales first before taring.";
+    //         ClearMessageAfterDelay();
+    //         return;
+    //     }
+
+    //     await ModbusService.TareScaleAsync(scaleNumber);
+    //     successMessage = $"⚖️ Scale {scaleNumber} tared successfully!";
+    //     ClearMessageAfterDelay();
+    // }
+
+    private async Task SaveBowl(int scaleNumber)
+    {
+        ClearMessages();
+
+        try
+        {
+            var nextId = GenerateNextBowlId();
+            Bowl newBowl;
+
+            if (scaleNumber == 1)
+            {
+                if (string.IsNullOrEmpty(scale1SelectedType))
+                {
+                    errorMessage = "Please select a bowl type!";
+                    return;
+                }
+
+                newBowl = new Bowl
+                {
+                    BowlId = nextId,
+                    BowlCode = nextId,
+                    Category = BowlCategory.RegularBowl,
+                    BowlType = scale1SelectedType,
+                    Weight = scale1Weight,
+                    Status = BowlStatus.Available,
+                    CurrentLocation = "Weighing Station",
+                    CreatedDate = DateTime.Now,
+                    LastModifiedDate = DateTime.Now,
+                    LastModifiedBy = currentUser,
+                    Remarks = "Weighed on Scale 1"
+                };
+
+                scale1Weight = 0m;
+                scale1SelectedType = string.Empty;
+            }
+            else
+            {
+                newBowl = new Bowl
+                {
+                    BowlId = nextId,
+                    BowlCode = nextId,
+                    Category = BowlCategory.MixingBowl,
+                    BowlType = BowlType.NotApplicable,
+                    Weight = scale2Weight,
+                    Status = BowlStatus.Available,
+                    CurrentLocation = "Mixing Station",
+                    CreatedDate = DateTime.Now,
+                    LastModifiedDate = DateTime.Now,
+                    LastModifiedBy = currentUser,
+                    Remarks = "Weighed on Scale 2"
+                };
+
+                scale2Weight = 0m;
+            }
+
+            // Save to Excel
+            await BowlService.SaveBowlAsync(newBowl);
+
+            // Reload list
+            await LoadBowls();
+
+            successMessage = $"✅ {newBowl.BowlCode} saved successfully! ({newBowl.Weight:0.000} kg)";
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save bowl: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteBowl(string bowlId)
+    {
+        ClearMessages();
+
+        try
+        {
+            await BowlService.DeleteBowlAsync(bowlId);
+            await LoadBowls();
+            successMessage = $"✅ Bowl {bowlId} deleted successfully!";
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete bowl: {ex.Message}";
+        }
+    }
+
+    private string GenerateNextBowlId()
+    {
+        if (!bowls.Any())
+            return "BOWL001";
+
+        var maxId = bowls
+            .Select(b => b.BowlId)
+            .Where(id => id.StartsWith("BOWL") && id.Length == 7)
+            .Select(id =>
+            {
+                if (int.TryParse(id.Substring(4), out int num))
+                    return num;
+                return 0;
+            })
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return $"BOWL{(maxId + 1):D3}";
+    }
+
+    private async Task RefreshBowls()
+    {
+        await LoadBowls();
+        successMessage = "Bowl list refreshed!";
+        ClearMessageAfterDelay();
+    }
+
+    private void OpenExcelFile()
+    {
+        try
+        {
+            BowlService.OpenExcelFile();
+            successMessage = "Excel file opened!";
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to open Excel: {ex.Message}";
+        }
+    }
+
+    private void ClearMessages()
+    {
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    private async void ClearMessageAfterDelay()
+    {
+        await Task.Delay(5000);
+        ClearMessages();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        StopReading();
+        readingCancellation?.Dispose();
+    }
+}

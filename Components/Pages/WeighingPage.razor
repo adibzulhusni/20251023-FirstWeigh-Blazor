@@ -1,0 +1,1300 @@
+﻿@page "/weighing"
+@page "/weighing/{BatchId}"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject IWeighingService WeighingService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+@inject ModbusScaleService ModbusService
+@inject BowlService BowlService
+
+<style>
+    /* Copy all your existing CSS styles here - they're fine */
+    .weighing-container {
+        min-height: 100vh;
+        background-color: #f5f7fa;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .weighing-header {
+        background: white;
+        border-bottom: 2px solid #e2e8f0;
+        padding: 16px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .header-info {
+        display: flex;
+        gap: 32px;
+        align-items: center;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-label {
+        font-size: 11px;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+
+    .info-value {
+        font-size: 16px;
+        color: #1a202c;
+        font-weight: 600;
+        font-family: 'Roboto Mono', monospace;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn-pause {
+        background-color: #ed8936;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-abort {
+        background-color: #f56565;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-start-modbus {
+        background-color: #48bb78;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-stop-modbus {
+        background-color: #718096;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .weighing-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 32px;
+        gap: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    .stage-indicator {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .stage-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #718096;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .stage-progress {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .stage-step {
+        flex: 1;
+        padding: 16px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: 600;
+        transition: all 0.3s;
+        border: 2px solid #e2e8f0;
+    }
+
+        .stage-step.active {
+            background: linear-gradient(135deg, #4a9eff, #3a8ee6);
+            color: white;
+            border-color: #4a9eff;
+            transform: scale(1.05);
+        }
+
+        .stage-step.completed {
+            background: #c6f6d5;
+            color: #22543d;
+            border-color: #48bb78;
+        }
+
+        .stage-step.pending {
+            background: #f7fafc;
+            color: #a0aec0;
+        }
+
+    .scale-card {
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .scale-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .scale-title-section {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .scale-label {
+        font-size: 14px;
+        font-weight: 700;
+        color: #4a9eff;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .scale-subtitle {
+        font-size: 13px;
+        color: #718096;
+    }
+
+    .ingredient-code {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 24px;
+        font-weight: 700;
+        color: #1a202c;
+        background: linear-gradient(135deg, #4a9eff, #3a8ee6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .bowl-size-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: #e6f7ff;
+        border: 2px solid #4a9eff;
+        border-radius: 20px;
+        font-weight: 600;
+        color: #2c5282;
+    }
+
+    .weight-display {
+        text-align: center;
+        margin: 32px 0;
+    }
+
+    .weight-value {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 72px;
+        font-weight: 700;
+        color: #1a202c;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+
+    .weight-unit {
+        font-size: 24px;
+        color: #718096;
+        font-weight: 600;
+    }
+
+    .weight-label {
+        font-size: 14px;
+        color: #718096;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .progress-section {
+        margin: 32px 0;
+    }
+
+    .progress-bar-container {
+        position: relative;
+        height: 40px;
+        background: #e2e8f0;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #f56565 0%, #ed8936 40%, #ecc94b 60%, #48bb78 80%, #38a169 100%);
+        border-radius: 20px;
+        transition: width 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 16px;
+    }
+
+    .progress-percentage {
+        font-size: 14px;
+        font-weight: 700;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .status-section {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+    }
+
+        .status-section.red {
+            background: linear-gradient(135deg, #fed7d7, #fc8181);
+        }
+
+        .status-section.yellow {
+            background: linear-gradient(135deg, #feebc8, #fbd38d);
+        }
+
+        .status-section.green {
+            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
+        }
+
+    .status-icon {
+        font-size: 32px;
+    }
+
+    .status-text {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .complete-section {
+        margin-top: auto;
+    }
+
+    .btn-complete {
+        width: 100%;
+        background: linear-gradient(135deg, #48bb78, #38a169);
+        color: white;
+        border: none;
+        padding: 18px 32px;
+        border-radius: 8px;
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+        .btn-complete:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(72, 187, 120, 0.5);
+        }
+
+        .btn-complete:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+    .empty-weighing {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-content {
+        max-width: 400px;
+    }
+
+    .empty-icon {
+        font-size: 64px;
+        margin-bottom: 24px;
+        opacity: 0.3;
+    }
+
+    .empty-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 12px;
+    }
+
+    .empty-text {
+        font-size: 16px;
+        color: #718096;
+        margin-bottom: 24px;
+    }
+
+    .btn-start {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 14px 32px;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a202c;
+        margin: 0;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .btn-secondary {
+        background-color: #e2e8f0;
+        color: #4a5568;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-danger {
+        background-color: #f56565;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+</style>
+
+<div class="weighing-container">
+    @if (session == null)
+    {
+        <!-- Empty State -->
+        <div class="empty-weighing">
+            <div class="empty-content">
+                <div class="empty-icon">⚖️</div>
+                <h2 class="empty-title">No Active Weighing Session</h2>
+                <p class="empty-text">Select a batch from the Production page to start weighing</p>
+                <button class="btn-start" @onclick="GoToProduction">Go to Production</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Header -->
+        <div class="weighing-header">
+            <div class="header-info">
+                <div class="info-item">
+                    <span class="info-label">Batch Code</span>
+                    <span class="info-value">@session.BatchId</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Repetition</span>
+                    <span class="info-value">@session.CurrentRepetition of @session.TotalRepetitions</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Ingredient</span>
+                    <span class="info-value">@(session.CurrentIngredientIndex + 1) of @session.TotalIngredients</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Operator</span>
+                    <span class="info-value">@session.OperatorName</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                @if (!isModbusReading)
+                {
+                    <button class="btn-start-modbus" @onclick="StartModbusReading">▶ Start Scales</button>
+                }
+                else
+                {
+                    <button class="btn-stop-modbus" @onclick="StopModbusReading">⏹ Stop Scales</button>
+                }
+                <button class="btn-pause" @onclick="PauseSession">⏸ Pause</button>
+                <button class="btn-abort" @onclick="OpenAbortModal">⛔ Abort</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="weighing-content">
+            <!-- Stage Indicator -->
+            <div class="stage-indicator">
+                <div class="stage-title">Weighing Process</div>
+                <div class="stage-progress">
+                    <div class="stage-step @(session.CurrentStage == WeighingStage.PlaceBowls ? "active" : session.CurrentStage > WeighingStage.PlaceBowls ? "completed" : "pending")">
+                        <div>📥 Stage 1</div>
+                        <div style="font-size: 12px; margin-top: 4px;">Place Bowls</div>
+                    </div>
+                    <div class="stage-step @(session.CurrentStage == WeighingStage.WeighIngredient ? "active" : session.CurrentStage > WeighingStage.WeighIngredient ? "completed" : "pending")">
+                        <div>⚖️ Stage 2</div>
+                        <div style="font-size: 12px; margin-top: 4px;">Weigh Ingredient</div>
+                    </div>
+                    <div class="stage-step @(session.CurrentStage == WeighingStage.Transfer ? "active" : "pending")">
+                        <div>🔄 Stage 3</div>
+                        <div style="font-size: 12px; margin-top: 4px;">Transfer</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STAGE 1: Bowl Selection -->
+            @if (session.CurrentStage == WeighingStage.PlaceBowls)
+            {
+                <div class="scale-card">
+                    <div class="scale-header">
+                        <div class="scale-title-section">
+                            <span class="scale-label">STAGE 1: SELECT & VERIFY BOWLS</span>
+                            <span class="scale-subtitle">Current Ingredient: @session.CurrentIngredient?.IngredientCode</span>
+                        </div>
+                    </div>
+
+                    @if (!isModbusReading)
+                    {
+                        <div style="padding: 24px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 12px; margin-bottom: 32px;">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                <span style="font-size: 48px;">⚠️</span>
+                                <div>
+                                    <p style="margin: 0; font-weight: 700; color: #856404; font-size: 18px; margin-bottom: 8px;">
+                                        Scales Must Be Running
+                                    </p>
+                                    <p style="margin: 0; color: #856404; font-size: 14px;">
+                                        Click "Start Scales" in the header above before selecting bowls.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div style="display: flex; gap: 32px; opacity: @(isModbusReading ? "1" : "0.5"); pointer-events: @(isModbusReading ? "auto" : "none");">
+                        <!-- Ingredient Bowl Selection -->
+                        <div style="flex: 1; padding: 24px; background: #f7fafc; border-radius: 12px; border: 2px solid @(ingredientBowlVerified ? "#48bb78" : "#e2e8f0");">
+                            <div class="weight-label" style="text-align: center;">Scale 1: Ingredient Bowl</div>
+                            <div class="bowl-size-badge" style="margin: 16px auto; display: inline-flex; width: 100%; justify-content: center;">
+                                🥣 @session.CurrentIngredient?.BowlSize Bowl Required
+                            </div>
+
+                            <div style="margin: 24px 0;">
+                                <select style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-family: 'Roboto Mono', monospace; position: relative; z-index: 1000;"
+                                        @bind="selectedIngredientBowlCode"
+                                        @bind:after="OnIngredientBowlSelected"
+                                        disabled="@ingredientBowlVerified">
+                                    <option value="">-- Select @session.CurrentIngredient?.BowlSize Bowl --</option>
+                                    @foreach (var bowl in availableIngredientBowls)
+                                    {
+                                        <option value="@bowl.BowlCode">@bowl.BowlCode - @bowl.Weight.ToString("F3") kg</option>
+                                    }
+                                </select>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(selectedIngredientBowlCode))
+                            {
+                                <div style="margin: 16px 0; padding: 16px; background: #fff3cd; border-radius: 8px;">
+                                    <p style="margin: 0; font-size: 13px; color: #856404;">
+                                        Selected: <strong>@selectedIngredientBowlCode</strong><br />
+                                        Expected: <strong>@selectedIngredientBowlWeight.ToString("F3") kg</strong>
+                                    </p>
+                                </div>
+                            }
+
+                            <div style="text-align: center; margin: 24px 0;">
+                                <div class="weight-value" style="font-size: 48px; color: @(ingredientBowlVerified ? "#48bb78" : "#1a202c");">
+                                    @scale1Weight.ToString("F3") <span class="weight-unit" style="font-size: 20px;">kg</span>
+                                </div>
+                            </div>
+
+                            @if (ingredientBowlVerified)
+                            {
+                                <div style="padding: 16px; background: #c6f6d5; border-radius: 8px; text-align: center;">
+                                    <span style="color: #22543d; font-weight: 700;">✓ Bowl Verified</span>
+                                </div>
+                            }
+                            else if (!string.IsNullOrEmpty(selectedIngredientBowlCode))
+                            {
+                                <button class="btn-complete" @onclick="VerifyIngredientBowl" style="font-size: 14px; padding: 12px;">
+                                    ✓ Verify Bowl Weight
+                                </button>
+                            }
+                        </div>
+
+                        <!-- Mixing Bowl Selection - ONLY FIRST INGREDIENT -->
+                        @if (session.CurrentIngredientIndex == 0)
+                        {
+                            <div style="flex: 1; padding: 24px; background: #f7fafc; border-radius: 12px; border: 2px solid @(mixingBowlVerified ? "#48bb78" : "#e2e8f0");">
+                                <div class="weight-label" style="text-align: center;">Scale 2: Mixing Bowl</div>
+                                <div class="bowl-size-badge" style="margin: 16px auto; display: inline-flex; width: 100%; justify-content: center;">
+                                    🥣 Mixing Bowl (Cumulative)
+                                </div>
+
+                                <div style="margin: 24px 0;">
+                                    <select style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-family: 'Roboto Mono', monospace; position: relative; z-index: 1000;"
+                                            @bind="selectedMixingBowlCode"
+                                            @bind:after="OnMixingBowlSelected"
+                                            disabled="@mixingBowlVerified">
+                                        <option value="">-- Select Mixing Bowl --</option>
+                                        @foreach (var bowl in availableMixingBowls)
+                                        {
+                                            <option value="@bowl.BowlCode">@bowl.BowlCode - @bowl.Weight.ToString("F3") kg</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(selectedMixingBowlCode))
+                                {
+                                    <div style="margin: 16px 0; padding: 16px; background: #fff3cd; border-radius: 8px;">
+                                        <p style="margin: 0; font-size: 13px; color: #856404;">
+                                            Selected: <strong>@selectedMixingBowlCode</strong><br />
+                                            Expected: <strong>@selectedMixingBowlWeight.ToString("F3") kg</strong>
+                                        </p>
+                                    </div>
+                                }
+
+                                <div style="text-align: center; margin: 24px 0;">
+                                    <div class="weight-value" style="font-size: 48px; color: @(mixingBowlVerified ? "#48bb78" : "#1a202c");">
+                                        @scale2Weight.ToString("F3") <span class="weight-unit" style="font-size: 20px;">kg</span>
+                                    </div>
+                                </div>
+
+                                @if (mixingBowlVerified)
+                                {
+                                    <div style="padding: 16px; background: #c6f6d5; border-radius: 8px; text-align: center;">
+                                        <span style="color: #22543d; font-weight: 700;">✓ Bowl Verified</span>
+                                    </div>
+                                }
+                                else if (!string.IsNullOrEmpty(selectedMixingBowlCode))
+                                {
+                                    <button class="btn-complete" @onclick="VerifyMixingBowl" style="font-size: 14px; padding: 12px;">
+                                        ✓ Verify Bowl Weight
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <!-- Show Scale 2 info for subsequent ingredients -->
+                            <div style="flex: 1; padding: 24px; background: #e6f7ff; border-radius: 12px; border: 2px solid #4a9eff;">
+                                <div class="weight-label" style="text-align: center;">Scale 2: Mixing Bowl</div>
+                                <div style="text-align: center; padding: 16px;">
+                                    <p style="margin: 0; color: #0c5460; font-size: 14px; font-weight: 600;">
+                                        📝 Mixing Bowl: @session.SelectedMixingBowlCode
+                                    </p>
+                                    <p style="margin: 8px 0 0 0; color: #0c5460; font-size: 13px;">
+                                        Tare Weight: @session.MixingBowlWeightBefore.ToString("F3") kg
+                                    </p>
+                                </div>
+                                <div style="text-align: center; margin: 24px 0;">
+                                    <div class="weight-value" style="font-size: 48px;">
+                                        @((scale2Weight - session.MixingBowlWeightBefore).ToString("F3")) <span class="weight-unit" style="font-size: 20px;">kg</span>
+                                    </div>
+                                    <p style="color: #718096; font-size: 12px; margin-top: 8px;">
+                                        NET CUMULATIVE WEIGHT
+                                    </p>
+                                </div>
+                                <div style="padding: 16px; background: #c6f6d5; border-radius: 8px; text-align: center;">
+                                    <span style="color: #22543d; font-weight: 700;">✓ Mixing Bowl On Scale 2</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <button class="btn-complete"
+                            @onclick="RecordBowlsAndContinue"
+                            disabled="@(!ingredientBowlVerified || (session.CurrentIngredientIndex == 0 && !mixingBowlVerified))"
+                            style="margin-top: 32px;">
+                        ✓ CONTINUE TO WEIGHING
+                    </button>
+                </div>
+            }
+
+            <!-- STAGE 2: Weigh Ingredient (Scale 1 only, hide during transfer) -->
+            @if (session.CurrentStage == WeighingStage.WeighIngredient && !isInTransferStage)
+            {
+                <div class="scale-card">
+                    <div class="scale-header">
+                        <div class="scale-title-section">
+                            <span class="scale-label">STAGE 2: WEIGH INGREDIENT</span>
+                            <span class="scale-subtitle">Add ingredient to bowl on Scale 1</span>
+                        </div>
+                        <div class="ingredient-code">@session.CurrentIngredient?.IngredientCode</div>
+                    </div>
+
+                    <div class="weight-display">
+                        <div class="weight-label">NET INGREDIENT WEIGHT</div>
+                        <div class="weight-value">
+                            @netWeight.ToString("F3") <span class="weight-unit">kg</span>
+                        </div>
+                        <p style="color: #718096; font-size: 14px; margin-top: 8px;">
+                            (Scale 1: @scale1Weight.ToString("F3") kg - Bowl: @session.IngredientBowlWeight.ToString("F3") kg)
+                        </p>
+                    </div>
+
+                    <div class="progress-section">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: @netProgress%">
+                                @if (netProgress > 15)
+                                {
+                                    <span class="progress-percentage">@netProgress%</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="status-section @netStatus.statusColor">
+                        <span class="status-icon">@netStatus.statusIcon</span>
+                        <span class="status-text">@netStatus.statusMessage</span>
+                    </div>
+
+                    <button class="btn-complete" disabled="@(!netStatus.canComplete)" @onclick="ReadyToTransfer">
+                        ✓ READY TO TRANSFER
+                    </button>
+                </div>
+            }
+
+            <!-- Scale 2 - Always Visible (During Weighing & Transfer) -->
+            @if (session.CurrentStage == WeighingStage.WeighIngredient)
+            {
+                <div class="scale-card">
+                    <div class="scale-header">
+                        <div class="scale-title-section">
+                            <span class="scale-label">SCALE 2</span>
+                            <span class="scale-subtitle">Mixture Bowl (Cumulative)</span>
+                        </div>
+                    </div>
+
+                    @if (session.MixingBowlWeightBefore > 0)
+                    {
+                        <div style="padding: 20px; background: #e6f7ff; border-radius: 8px; margin-bottom: 16px;">
+                            <p style="margin: 0; color: #0c5460; font-size: 13px; font-weight: 600;">
+                                📝 Bowl Tare Weight: @session.MixingBowlWeightBefore.ToString("F3") kg
+                            </p>
+                        </div>
+                    }
+
+                    <div class="weight-display">
+                        <div class="weight-label">NET CUMULATIVE WEIGHT</div>
+                        <div class="weight-value">
+                            @((scale2Weight - session.MixingBowlWeightBefore).ToString("F3")) <span class="weight-unit">kg</span>
+                        </div>
+                        <p style="color: #718096; font-size: 14px; margin-top: 8px;">
+                            (Scale 2: @scale2Weight.ToString("F3") kg - Bowl: @session.MixingBowlWeightBefore.ToString("F3") kg)
+                        </p>
+                    </div>
+
+                    <div class="progress-section">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: @scale2Progress%">
+                                @if (scale2Progress > 15)
+                                {
+                                    <span class="progress-percentage">@scale2Progress%</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (isInTransferStage)
+                    {
+                        <div style="margin-top: 24px; padding: 20px; background: @(transferWeightMatches ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fff3cd, #ffeaa7)");
+                                                border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 32px; margin-bottom: 8px;">
+                                    @(transferWeightMatches ? "✅" : "⏳")
+                                </div>
+                                <p style="margin: 0; font-size: 16px; font-weight: 700; color: @(transferWeightMatches ? "#22543d" : "#856404");">
+                                    @(transferWeightMatches ? "Weight Verified - Transfer Complete!" : "Transferring Material...")
+                                </p>
+                                <p style="margin: 8px 0 0 0; font-size: 13px; color: @(transferWeightMatches ? "#22543d" : "#856404");">
+                                    @(transferWeightMatches ? "Click button below to continue" : "Waiting for correct weight on Scale 2")
+                                </p>
+                            </div>
+                        </div>
+
+                        <button class="btn-complete"
+                                disabled="@(!transferWeightMatches)"
+                                @onclick="ConfirmTransfer"
+                                style="margin-top: 20px; background: @(transferWeightMatches ? "#28a745" : "#cbd5e0");
+                                                   cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
+                                                   opacity: @(transferWeightMatches ? "1" : "0.5");">
+                            @(transferWeightMatches ? "✓ COMPLETE TRANSFER" : "⏳ WAITING FOR CORRECT WEIGHT...")
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="status-section green">
+                            <span class="status-icon">✓</span>
+                            <span class="status-text">Cumulative total tracking</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Abort Modal -->
+@if (showAbortModal)
+{
+    <div class="modal-overlay" @onclick="CloseAbortModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">⚠️ Abort Weighing Session</h2>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to abort this weighing session?</p>
+                <p style="margin-top: 12px; font-size: 14px; color: #718096;">
+                    Batch: <strong>@session?.BatchId</strong>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseAbortModal">Cancel</button>
+                <button class="btn-danger" @onclick="ConfirmAbort">Abort Session</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Bowl Removal Modal - Only for last ingredient -->
+@if (showBowlRemovalModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" @onclick:stopPropagation="true" style="max-width: 500px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <h2 class="modal-title" style="color: white;">🧹 Remove Mixing Bowl</h2>
+            </div>
+            <div class="modal-body" style="padding: 32px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🥣 ➡️ ❌</div>
+                <h3 style="font-size: 20px; font-weight: 600; color: #1a202c; margin-bottom: 16px;">
+                    All Ingredients Complete!
+                </h3>
+                <p style="color: #666; font-size: 14px; margin-bottom: 24px;">
+                    Remove the mixing bowl from Scale 2
+                </p>
+
+                <div style="padding: 20px; border-radius: 12px; margin-bottom: 24px;
+                                background: @(isScale2Clear ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fed7d7, #fc8181)");
+                                border: 3px solid @(isScale2Clear ? "#48bb78" : "#f56565");">
+                    <div style="font-size: 32px; margin-bottom: 8px;">
+                        @(isScale2Clear ? "✅" : "⚠️")
+                    </div>
+                    <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 8px;">SCALE 2</div>
+                    <div style="font-family: 'Roboto Mono', monospace; font-size: 28px; font-weight: 700; color: #1a202c;">
+                        @scale2Weight.ToString("F3") kg
+                    </div>
+                    <div style="font-size: 12px; margin-top: 8px; font-weight: 600;">
+                        @(isScale2Clear ? "CLEAR ✓" : "REMOVE BOWL")
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary"
+                        @onclick="CompleteBowlRemoval"
+                        disabled="@(!isScale2Clear)"
+                        style="background: @(isScale2Clear ? "#28a745" : "#cbd5e0");
+                                   padding: 12px 32px;
+                                   cursor: @(isScale2Clear ? "pointer" : "not-allowed");
+                                   opacity: @(isScale2Clear ? "1" : "0.6");">
+                    @(isScale2Clear ? "✓ Complete Batch" : "⏳ Waiting...")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? BatchId { get; set; }
+
+    private WeighingSession? session;
+    private CancellationTokenSource? _cancellationTokenSource;
+    private bool showAbortModal = false;
+    private bool isModbusReading = false;
+    private bool isModbusConnected = false;
+
+    private bool isInTransferStage = false;
+    private bool transferWeightMatches = false;
+    private bool showBowlRemovalModal = false;
+    private decimal bowlRemovalTolerance = 0.1m;
+
+    private decimal scale1Weight => ModbusService.Scale1Weight;
+    private decimal scale2Weight => ModbusService.Scale2Weight;
+    private decimal netWeight => session != null ? WeighingService.GetNetIngredientWeight(scale1Weight) : 0;
+
+    private bool isScale2Clear => Math.Abs(scale2Weight) <= bowlRemovalTolerance;
+
+    private int netProgress = 0;
+    private int scale2Progress = 0;
+    private (string statusColor, string statusIcon, string statusMessage, bool canComplete) netStatus;
+
+    private List<Bowl> availableIngredientBowls = new();
+    private List<Bowl> availableMixingBowls = new();
+    private string selectedIngredientBowlCode = string.Empty;
+    private decimal selectedIngredientBowlWeight = 0;
+    private string selectedMixingBowlCode = string.Empty;
+    private decimal selectedMixingBowlWeight = 0;
+    private bool ingredientBowlVerified = false;
+    private bool mixingBowlVerified = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        session = WeighingService.GetActiveSession();
+
+        if (session == null && !string.IsNullOrEmpty(BatchId))
+        {
+            session = await WeighingService.StartWeighingSessionAsync(BatchId);
+        }
+
+        if (session != null)
+        {
+            await LoadAvailableBowls();
+            UpdateStatus();
+        }
+    }
+
+    private async Task LoadAvailableBowls()
+    {
+        if (session?.CurrentIngredient == null) return;
+
+        var allBowls = await BowlService.GetAllBowlsAsync();
+
+        availableIngredientBowls = allBowls
+            .Where(b => b.Category == BowlCategory.RegularBowl
+                        && b.BowlType == session.CurrentIngredient.BowlSize
+                        && b.Status == BowlStatus.Available)
+            .ToList();
+
+        availableMixingBowls = allBowls
+            .Where(b => b.Category == BowlCategory.MixingBowl
+                        && b.Status == BowlStatus.Available)
+            .ToList();
+    }
+
+    private void OnIngredientBowlSelected()
+    {
+        if (string.IsNullOrEmpty(selectedIngredientBowlCode))
+        {
+            selectedIngredientBowlWeight = 0;
+            ingredientBowlVerified = false;
+            return;
+        }
+
+        var bowl = availableIngredientBowls.FirstOrDefault(b => b.BowlCode == selectedIngredientBowlCode);
+        if (bowl != null)
+        {
+            selectedIngredientBowlWeight = bowl.Weight;
+            ingredientBowlVerified = false;
+        }
+    }
+
+    private void OnMixingBowlSelected()
+    {
+        if (string.IsNullOrEmpty(selectedMixingBowlCode))
+        {
+            selectedMixingBowlWeight = 0;
+            mixingBowlVerified = false;
+            return;
+        }
+
+        var bowl = availableMixingBowls.FirstOrDefault(b => b.BowlCode == selectedMixingBowlCode);
+        if (bowl != null)
+        {
+            selectedMixingBowlWeight = bowl.Weight;
+            mixingBowlVerified = false;
+        }
+    }
+
+    private async Task VerifyIngredientBowl()
+    {
+        if (string.IsNullOrEmpty(selectedIngredientBowlCode))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "⚠️ Please select a bowl first!");
+            return;
+        }
+
+        var result = WeighingService.VerifyBowlWeight(scale1Weight, selectedIngredientBowlWeight, selectedIngredientBowlCode, 0.05m);
+
+        if (result.isValid)
+        {
+            ingredientBowlVerified = true;
+            await JSRuntime.InvokeVoidAsync("alert", $"✅ {result.message}");
+        }
+        else
+        {
+            ingredientBowlVerified = false;
+            await JSRuntime.InvokeVoidAsync("alert", $"❌ {result.message}");
+        }
+    }
+
+    private async Task VerifyMixingBowl()
+    {
+        if (string.IsNullOrEmpty(selectedMixingBowlCode))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "⚠️ Please select a bowl first!");
+            return;
+        }
+
+        var result = WeighingService.VerifyBowlWeight(scale2Weight, selectedMixingBowlWeight, selectedMixingBowlCode, 0.05m);
+
+        if (result.isValid)
+        {
+            mixingBowlVerified = true;
+            await JSRuntime.InvokeVoidAsync("alert", $"✅ {result.message}");
+        }
+        else
+        {
+            mixingBowlVerified = false;
+            await JSRuntime.InvokeVoidAsync("alert", $"❌ {result.message}");
+        }
+    }
+
+    private async Task RecordBowlsAndContinue()
+    {
+        if (session == null || !ingredientBowlVerified) return;
+        if (session.CurrentIngredientIndex == 0 && !mixingBowlVerified) return;
+
+        WeighingService.SelectBowls(
+            session.BatchId,
+            selectedIngredientBowlCode,
+            selectedIngredientBowlWeight,
+            selectedMixingBowlCode,
+            selectedMixingBowlWeight
+        );
+
+        session.CurrentStage = WeighingStage.WeighIngredient;
+        UpdateStatus();
+    }
+
+    private async Task StartModbusReading()
+    {
+        if (isModbusReading) return;
+
+        try
+        {
+            if (!isModbusConnected)
+            {
+                var connected = await ModbusService.ConnectAsync();
+                if (!connected)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "⚠️ Failed to connect to scales");
+                    return;
+                }
+                isModbusConnected = true;
+            }
+
+            ModbusService.WeightUpdated += OnWeightUpdated;
+            _cancellationTokenSource = new CancellationTokenSource();
+            isModbusReading = true;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await ModbusService.StartReadingAsync(_cancellationTokenSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        isModbusReading = false;
+                        isModbusConnected = false;
+                        await JSRuntime.InvokeVoidAsync("alert", $"❌ Scale error: {ex.Message}");
+                        StateHasChanged();
+                    });
+                }
+            });
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"❌ Error: {ex.Message}");
+        }
+    }
+
+    private void StopModbusReading()
+    {
+        if (!isModbusReading) return;
+
+        ModbusService.WeightUpdated -= OnWeightUpdated;
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = null;
+        isModbusReading = false;
+        StateHasChanged();
+    }
+
+    private void OnWeightUpdated(decimal s1, decimal s2)
+    {
+        InvokeAsync(() =>
+        {
+            UpdateStatus();
+            StateHasChanged();
+        });
+    }
+
+    private void UpdateStatus()
+    {
+        if (session?.CurrentIngredient == null) return;
+
+        if (session.CurrentStage == WeighingStage.WeighIngredient)
+        {
+            netStatus = WeighingService.GetIngredientStatusByNet(netWeight, session.CurrentIngredient);
+            var targetWeight = session.CurrentIngredient.TargetWeight;
+            netProgress = targetWeight > 0 ? Math.Min(100, (int)((netWeight / targetWeight) * 100)) : 0;
+        }
+
+        decimal netScale2Weight = scale2Weight - session.MixingBowlWeightBefore;
+        decimal totalRecipeWeight = session.Ingredients.Sum(i => i.TargetWeight);
+        scale2Progress = totalRecipeWeight > 0 ? Math.Min(100, (int)((netScale2Weight / totalRecipeWeight) * 100)) : 0;
+
+        if (isInTransferStage && session != null)
+        {
+            decimal expectedCumulative = 0;
+            for (int i = 0; i <= session.CurrentIngredientIndex; i++)
+            {
+                if (i < session.Ingredients.Count)
+                    expectedCumulative += session.Ingredients[i].TargetWeight;
+            }
+
+            decimal netScale2 = scale2Weight - session.MixingBowlWeightBefore;
+            transferWeightMatches = Math.Abs(netScale2 - expectedCumulative) <= 0.05m;
+        }
+    }
+
+    private async Task ReadyToTransfer()
+    {
+        if (session == null || !netStatus.canComplete) return;
+
+        await WeighingService.ReadyToTransferAsync(session.BatchId, netWeight);
+        isInTransferStage = true;
+        transferWeightMatches = false;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmTransfer()
+    {
+        if (session == null || !transferWeightMatches) return;
+
+        var completed = await WeighingService.ConfirmTransferAsync(session.BatchId, scale2Weight);
+
+        if (completed)
+        {
+            isInTransferStage = false;
+            transferWeightMatches = false;
+
+            // ✅ CRITICAL: Refresh session - it might have been nulled by the service
+            session = WeighingService.GetActiveSession();
+
+            // ✅ If session is now null, batch is complete!
+            if (session == null)
+            {
+                StopModbusReading();
+                await JSRuntime.InvokeVoidAsync("alert", "🎉 Batch completed successfully!");
+                Navigation.NavigateTo("/production");
+                return;
+            }
+
+            // Check if starting a new repetition (CurrentIngredientIndex was reset to 0)
+            if (session.CurrentIngredientIndex == 0)
+            {
+                // ✅ NEW REPETITION - Reset BOTH bowls
+                await JSRuntime.InvokeVoidAsync("alert",
+                    $"✅ Repetition {session.CurrentRepetition - 1} Complete!\n\n" +
+                    $"Starting Repetition {session.CurrentRepetition} of {session.TotalRepetitions}\n\n" +
+                    "Please select and verify BOTH bowls again.");
+
+                // Reset ALL bowl selection states
+                selectedIngredientBowlCode = string.Empty;
+                selectedIngredientBowlWeight = 0;
+                ingredientBowlVerified = false;
+                selectedMixingBowlCode = string.Empty;
+                selectedMixingBowlWeight = 0;
+                mixingBowlVerified = false;
+
+                await LoadAvailableBowls();
+
+                if (session != null)
+                {
+                    session.CurrentStage = WeighingStage.PlaceBowls;
+                }
+
+                UpdateStatus();
+                StateHasChanged();
+                return;
+            }
+
+            // Not new repetition - just next ingredient (mixing bowl stays)
+            await JSRuntime.InvokeVoidAsync("alert",
+                "✅ Transfer Complete!\n\n" +
+                "Remove ingredient bowl from Scale 1.\n" +
+                "Mixing bowl stays on Scale 2.\n\n" +
+                $"Ready for next ingredient.");
+
+            // Only reset ingredient bowl
+            selectedIngredientBowlCode = string.Empty;
+            selectedIngredientBowlWeight = 0;
+            ingredientBowlVerified = false;
+
+            await LoadAvailableBowls();
+
+            if (session != null)
+            {
+                session.CurrentStage = WeighingStage.PlaceBowls;
+            }
+
+            UpdateStatus();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CompleteBowlRemoval()
+    {
+        if (session == null || !isScale2Clear) return;
+
+        showBowlRemovalModal = false;
+        StopModbusReading();
+
+        await JSRuntime.InvokeVoidAsync("alert", "🎉 Batch completed successfully!");
+        Navigation.NavigateTo("/production");
+    }
+
+    private async Task PauseSession()
+    {
+        if (session == null) return;
+        StopModbusReading();
+        await WeighingService.PauseSessionAsync(session.BatchId);
+        Navigation.NavigateTo("/production");
+    }
+
+    private void OpenAbortModal()
+    {
+        showAbortModal = true;
+    }
+
+    private void CloseAbortModal()
+    {
+        showAbortModal = false;
+    }
+
+    private async Task ConfirmAbort()
+    {
+        if (session == null) return;
+        StopModbusReading();
+        await WeighingService.AbortSessionAsync(session.BatchId, "Aborted from weighing interface", session.OperatorName);
+        Navigation.NavigateTo("/production");
+    }
+
+    private void GoToProduction()
+    {
+        Navigation.NavigateTo("/production");
+    }
+
+    public void Dispose()
+    {
+        StopModbusReading();
+    }
+}

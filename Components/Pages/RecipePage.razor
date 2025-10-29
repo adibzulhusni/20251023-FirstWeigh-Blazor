@@ -1,0 +1,1090 @@
+﻿@page "/recipes"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject RecipeService RecipeService
+@inject IngredientService IngredientService
+
+<PageTitle>Recipe Management</PageTitle>
+
+<style>
+    .page-container {
+        padding: 32px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .btn-primary {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+    }
+
+        .btn-primary:hover {
+            background-color: #3a8ee6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
+        }
+
+    .alert {
+        padding: 16px 20px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .search-section {
+        margin-bottom: 24px;
+    }
+
+    .search-box {
+        width: 100%;
+        max-width: 400px;
+        padding: 12px 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+    .table-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background-color: #f7fafc;
+    }
+
+    th {
+        padding: 16px;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    td {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+    }
+
+    tbody tr {
+        transition: background-color 0.2s;
+    }
+
+        tbody tr:hover {
+            background-color: #f7fafc;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+    .recipe-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .recipe-name {
+        font-weight: 600;
+        color: #1a202c;
+    }
+
+    .recipe-code {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 12px;
+        color: #718096;
+    }
+
+    .ingredient-count {
+        font-family: 'Roboto Mono', monospace;
+        color: #4a5568;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .status-active {
+        background-color: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-archived {
+        background-color: #e2e8f0;
+        color: #4a5568;
+    }
+
+    .status-draft {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+
+    .status-active .status-dot {
+        background-color: #38a169;
+    }
+
+    .status-archived .status-dot {
+        background-color: #718096;
+    }
+
+    .status-draft .status-dot {
+        background-color: #ffc107;
+    }
+
+    .date-text {
+        color: #718096;
+        font-size: 13px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-view {
+        background-color: #e2e8f0;
+        color: #4a5568;
+    }
+
+        .btn-view:hover {
+            background-color: #cbd5e0;
+        }
+
+    .btn-edit {
+        background-color: #bee3f8;
+        color: #2c5282;
+    }
+
+        .btn-edit:hover {
+            background-color: #90cdf4;
+        }
+
+    .btn-delete {
+        background-color: #fed7d7;
+        color: #c53030;
+    }
+
+        .btn-delete:hover {
+            background-color: #fc8181;
+        }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #718096;
+    }
+
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.3;
+    }
+
+    .empty-state-text {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-subtext {
+        font-size: 14px;
+        color: #a0aec0;
+    }
+
+    .modal-backdrop {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 9999 !important;
+        animation: fadeIn 0.2s;
+    }
+
+    .modal {
+        background: white !important;
+        border-radius: 12px;
+        max-width: 900px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+        animation: slideUp 0.3s;
+        position: relative;
+        z-index: 10000 !important;
+    }
+
+    @@keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #a0aec0;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+
+        .btn-close:hover {
+            background-color: #f7fafc;
+            color: #4a5568;
+        }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        background-color: #f7fafc;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        .form-control:disabled {
+            background-color: #f7fafc;
+            color: #a0aec0;
+            cursor: not-allowed;
+        }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .btn-secondary {
+        background-color: #e2e8f0;
+        color: #4a5568;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e0;
+        }
+
+    .btn-success {
+        background-color: #48bb78;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-success:hover {
+            background-color: #38a169;
+        }
+
+    /* Ingredients Section */
+    .ingredients-section {
+        margin-top: 32px;
+        padding: 20px;
+        background-color: #f7fafc;
+        border-radius: 8px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .btn-add {
+        background-color: #48bb78;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-add:hover {
+            background-color: #38a169;
+        }
+
+    .ingredient-item {
+        display: grid;
+        grid-template-columns: 40px 2fr 1fr 1fr 100px 80px 100px 60px;
+        gap: 12px;
+        align-items: center;
+        padding: 16px;
+        background: white;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .sequence-number {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee6 100%);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+    }
+
+    .ingredient-select {
+        padding: 8px 12px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+
+        .ingredient-select:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+    .ingredient-input {
+        padding: 8px 12px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+
+        .ingredient-input:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+    .weight-range {
+        font-size: 11px;
+        color: #718096;
+        line-height: 1.4;
+    }
+
+    .btn-remove {
+        background-color: #fc8181;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+
+        .btn-remove:hover {
+            background-color: #f56565;
+        }
+
+    @@media (max-width: 1024px) {
+        .page-container {
+            padding: 20px;
+        }
+
+        .ingredient-item {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .search-box {
+            max-width: 100%;
+        }
+
+        .table-card {
+            overflow-x: auto;
+        }
+
+        table {
+            min-width: 1000px;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="page-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">Recipe Management</h1>
+        <button class="btn-primary" @onclick="OpenCreateModal">+ Add Recipe</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">
+            ✅ @successMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-error">
+            ❌ @errorMessage
+        </div>
+    }
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <input type="text" class="search-box" placeholder="Search recipes by name or code..."
+               @bind="searchTerm" @bind:event="oninput">
+    </div>
+
+    <!-- Recipes Table -->
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Recipe</th>
+                    <th>Number of Ingredients</th>
+                    <th>Status</th>
+                    <th>Created Date</th>
+                    <th>Last Modified</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!filteredRecipes.Any())
+                {
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <div class="empty-state-text">
+                                    @if (string.IsNullOrEmpty(searchTerm))
+                                    {
+                                        <text>No recipes found</text>
+                                    }
+                                    else
+                                    {
+                                        <text>No recipes found matching "@searchTerm"</text>
+                                    }
+                                </div>
+                                <div class="empty-state-subtext">
+                                    @if (string.IsNullOrEmpty(searchTerm))
+                                    {
+                                        <text>Click "+ Add Recipe" to create your first recipe</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Try a different search term</text>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var recipe in filteredRecipes)
+                    {
+                        <tr>
+                            <td>
+                                <div class="recipe-info">
+                                    <span class="recipe-name">@recipe.RecipeName</span>
+                                    <span class="recipe-code">@recipe.RecipeCode</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="ingredient-count">@recipe.Ingredients.Count</span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-@recipe.Status.ToLower()">
+                                    <span class="status-dot"></span>
+                                    @recipe.Status
+                                </span>
+                            </td>
+                            <td>
+                                <span class="date-text">@recipe.CreatedDate.ToString("MMM dd, yyyy")</span>
+                            </td>
+                            <td>
+                                <span class="date-text">@recipe.LastModifiedDate.ToString("MMM dd, yyyy HH:mm")</span>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-action btn-view" @onclick="() => ViewRecipe(recipe.RecipeId)">View</button>
+                                    <button class="btn-action btn-edit" @onclick="() => EditRecipe(recipe.RecipeId)">Edit</button>
+                                    <button class="btn-action btn-delete" @onclick="() => DeleteRecipe(recipe.RecipeId)">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (showModal)
+{
+    <div style="position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; background: rgba(0, 0, 0, 0.6) !important; z-index: 999999 !important; display: flex !important; align-items: center !important; justify-content: center !important;" @onclick="CloseModal">
+        <div style="background: white !important; border-radius: 12px; max-width: 1400px; width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important; position: relative; z-index: 1000000 !important;" @onclick:stopPropagation="true">
+
+            <!-- Modal Header -->
+            <div style="padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 20px; font-weight: 700; color: #1a202c; margin: 0;">
+                    @(isViewMode ? "View Recipe" : isEditMode ? "Edit Recipe" : "Create New Recipe")
+                </h3>
+                <button style="background: none; border: none; font-size: 24px; color: #a0aec0; cursor: pointer; padding: 0; width: 32px; height: 32px;" @onclick="CloseModal">×</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div style="padding: 24px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                    <div>
+                        <label style="display: block; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">Recipe Code *</label>
+                        <input type="text" style="width: 100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px;" @bind="currentRecipe.RecipeCode" disabled="@(isViewMode || isEditMode)" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">Recipe Name *</label>
+                        <input type="text" style="width: 100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px;" @bind="currentRecipe.RecipeName" disabled="@isViewMode" />
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">Description</label>
+                    <textarea style="width: 100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px;" rows="3" @bind="currentRecipe.Description" disabled="@isViewMode"></textarea>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 14px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">Status</label>
+                    <select style="width: 100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px;" @bind="currentRecipe.Status" disabled="@isViewMode">
+                        <option value="@RecipeStatus.Active">Active</option>
+                        <option value="@RecipeStatus.Draft">Draft</option>
+                        <option value="@RecipeStatus.Archived">Archived</option>
+                    </select>
+                </div>
+
+                <!-- Ingredients Section -->
+                <div style="margin-top: 32px; padding: 20px; background-color: #f7fafc; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h4 style="font-size: 16px; font-weight: 700; color: #1a202c; margin: 0;">Ingredients (@currentRecipe.Ingredients.Count)</h4>
+                        @if (!isViewMode)
+                        {
+                            <button style="background-color: #48bb78; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;" @onclick="AddIngredient">+ Add Ingredient</button>
+                        }
+                    </div>
+
+                    @if (currentRecipe.Ingredients.Any())
+                    {
+                        @foreach (var ingredient in currentRecipe.Ingredients.OrderBy(i => i.Sequence))
+                        {
+                            <div style="display: grid; grid-template-columns: 40px 2fr 1fr 1fr 100px 80px 100px 60px; gap: 12px; align-items: center; padding: 16px; background: white; border-radius: 6px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #4a9eff 0%, #3a8ee6 100%); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;">
+                                    @ingredient.Sequence
+                                </div>
+
+                                <select style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" @bind="ingredient.IngredientId" @bind:after="() => UpdateIngredientDetails(ingredient)" disabled="@isViewMode">
+                                    <option value="">-- Select Ingredient --</option>
+                                    @foreach (var ing in availableIngredients)
+                                    {
+                                        <option value="@ing.IngredientId">@ing.IngredientName (@ing.IngredientCode)</option>
+                                    }
+                                </select>
+
+                                <input type="number" style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" placeholder="Weight (kg)" @bind="ingredient.TargetWeight" step="0.001" disabled="@isViewMode" />
+
+                                <input type="number" style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" placeholder="Tolerance (%)" @bind="ingredient.TolerancePercentage" step="0.01" disabled="@isViewMode" />
+
+                                <select style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" @bind="ingredient.BowlSize" disabled="@isViewMode">
+                                    <option value="">-- Bowl --</option>
+                                    <option value="Small">🥣 Small</option>
+                                    <option value="Medium">🥣 Medium</option>
+                                    <option value="Large">🥣 Large</option>
+                                </select>
+
+                                <select style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" @bind="ingredient.ScaleNumber" disabled="@isViewMode">
+                                    <option value="1">Scale 1</option>
+                                    <option value="2">Scale 2</option>
+                                </select>
+
+                                <div style="font-size: 11px; color: #718096; line-height: 1.4;">
+                                    Min: @ingredient.MinWeight.ToString("0.000")<br />
+                                    Max: @ingredient.MaxWeight.ToString("0.000")
+                                </div>
+
+                                @if (!isViewMode)
+                                {
+                                    <button style="background-color: #fc8181; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px;" @onclick="() => RemoveIngredient(ingredient.Sequence)">×</button>
+                                }
+                                else
+                                {
+                                    <div></div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p style="text-align: center; color: #a0aec0; padding: 20px;">No ingredients added yet</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding: 20px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background-color: #f7fafc;">
+                <button style="background-color: #e2e8f0; color: #4a5568; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;" @onclick="CloseModal">Cancel</button>
+                @if (!isViewMode)
+                {
+                    <button style="background-color: #48bb78; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;" @onclick="SaveRecipe">Save Recipe</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+@code {
+    private List<Recipe> recipes = new();
+    private List<Recipe> filteredRecipes = new();
+    private List<Ingredient> availableIngredients = new();
+    private string searchTerm = string.Empty;
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private bool showModal = false;
+    private bool isEditMode = false;
+    private bool isViewMode = false;
+    private Recipe currentRecipe = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            recipes = await RecipeService.GetAllRecipesAsync();
+
+            foreach (var recipe in recipes)
+            {
+                recipe.Ingredients = await RecipeService.GetRecipeIngredientsAsync(recipe.RecipeId);
+            }
+
+            availableIngredients = await IngredientService.GetAllIngredientsAsync();
+            FilterRecipes();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            errorMessage = $"Failed to load data: {ex.Message}";
+        }
+    }
+
+    private void FilterRecipes()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredRecipes = recipes.OrderByDescending(r => r.CreatedDate).ToList();
+        }
+        else
+        {
+            var term = searchTerm.ToLower();
+            filteredRecipes = recipes
+                .Where(r => r.RecipeCode.ToLower().Contains(term) ||
+                           r.RecipeName.ToLower().Contains(term))
+                .OrderByDescending(r => r.CreatedDate)
+                .ToList();
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        Console.WriteLine("🔵 OpenCreateModal called!");
+
+        currentRecipe = new Recipe
+        {
+            RecipeId = GenerateRecipeId(),
+            RecipeCode = GenerateRecipeCode(),
+            Status = RecipeStatus.Draft,
+            CreatedDate = DateTime.Now,
+            LastModifiedDate = DateTime.Now,
+            CreatedBy = "system",
+            LastModifiedBy = "system"
+        };
+        isEditMode = false;
+        isViewMode = false;
+        showModal = true;
+
+        Console.WriteLine($"🔵 showModal = {showModal}");
+        Console.WriteLine($"🔵 Recipe Code: {currentRecipe.RecipeCode}");
+
+        StateHasChanged();
+    }
+
+    private async Task ViewRecipe(string recipeId)
+    {
+        var recipe = await RecipeService.GetRecipeByIdAsync(recipeId);
+        if (recipe != null)
+        {
+            currentRecipe = recipe;
+            isViewMode = true;
+            isEditMode = false;
+            showModal = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task EditRecipe(string recipeId)
+    {
+        var recipe = await RecipeService.GetRecipeByIdAsync(recipeId);
+        if (recipe != null)
+        {
+            currentRecipe = recipe;
+            isEditMode = true;
+            isViewMode = false;
+            showModal = true;
+            StateHasChanged();
+        }
+    }
+
+    private void AddIngredient()
+    {
+        var nextSequence = currentRecipe.Ingredients.Any()
+            ? currentRecipe.Ingredients.Max(i => i.Sequence) + 1
+            : 1;
+
+        currentRecipe.Ingredients.Add(new RecipeIngredient
+        {
+            RecipeId = currentRecipe.RecipeId,
+            Sequence = nextSequence,
+            ScaleNumber = 1,
+            Unit = "kg",
+            TolerancePercentage = 2.0m,
+            BowlSize = "Medium" // ✅ NEW: Default bowl size
+        });
+
+        StateHasChanged();
+    }
+
+    private void RemoveIngredient(int sequence)
+    {
+        var ingredient = currentRecipe.Ingredients.FirstOrDefault(i => i.Sequence == sequence);
+        if (ingredient != null)
+        {
+            currentRecipe.Ingredients.Remove(ingredient);
+
+            var seq = 1;
+            foreach (var ing in currentRecipe.Ingredients.OrderBy(i => i.Sequence))
+            {
+                ing.Sequence = seq++;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void UpdateIngredientDetails(RecipeIngredient recipeIngredient)
+    {
+        var ingredient = availableIngredients.FirstOrDefault(i => i.IngredientId == recipeIngredient.IngredientId);
+        if (ingredient != null)
+        {
+            recipeIngredient.IngredientCode = ingredient.IngredientCode;
+            recipeIngredient.IngredientName = ingredient.IngredientName;
+            recipeIngredient.Unit = ingredient.UnitOfMeasure;
+        }
+    }
+
+    private async Task SaveRecipe()
+    {
+        ClearMessages();
+
+        if (string.IsNullOrWhiteSpace(currentRecipe.RecipeCode) ||
+            string.IsNullOrWhiteSpace(currentRecipe.RecipeName))
+        {
+            errorMessage = "Recipe code and name are required!";
+            StateHasChanged();
+            return;
+        }
+
+        if (!currentRecipe.Ingredients.Any())
+        {
+            errorMessage = "Please add at least one ingredient!";
+            StateHasChanged();
+            return;
+        }
+
+        foreach (var ing in currentRecipe.Ingredients)
+        {
+            if (string.IsNullOrEmpty(ing.IngredientId))
+            {
+                errorMessage = $"Please select an ingredient for sequence {ing.Sequence}";
+                StateHasChanged();
+                return;
+            }
+            if (ing.TargetWeight <= 0)
+            {
+                errorMessage = $"Please enter a valid target weight for {ing.IngredientName}";
+                StateHasChanged();
+                return;
+            }
+            if (string.IsNullOrEmpty(ing.BowlSize))
+            {
+                errorMessage = $"Please select a bowl size for {ing.IngredientName}";
+                StateHasChanged();
+                return;
+            }
+        }
+
+        try
+        {
+            if (isEditMode)
+            {
+                currentRecipe.LastModifiedDate = DateTime.Now;
+                await RecipeService.UpdateRecipeAsync(currentRecipe);
+
+                var oldIngredients = await RecipeService.GetRecipeIngredientsAsync(currentRecipe.RecipeId);
+                foreach (var old in oldIngredients)
+                {
+                    await RecipeService.DeleteRecipeIngredientAsync(currentRecipe.RecipeId, old.Sequence);
+                }
+
+                foreach (var ingredient in currentRecipe.Ingredients)
+                {
+                    await RecipeService.SaveRecipeIngredientAsync(ingredient);
+                }
+
+                successMessage = $"Recipe {currentRecipe.RecipeCode} updated successfully!";
+            }
+            else
+            {
+                await RecipeService.SaveRecipeAsync(currentRecipe);
+
+                foreach (var ingredient in currentRecipe.Ingredients)
+                {
+                    await RecipeService.SaveRecipeIngredientAsync(ingredient);
+                }
+
+                successMessage = $"Recipe {currentRecipe.RecipeCode} created successfully!";
+            }
+
+            await LoadData();
+            CloseModal();
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save recipe: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteRecipe(string recipeId)
+    {
+        try
+        {
+            await RecipeService.DeleteRecipeAsync(recipeId);
+            await LoadData();
+            successMessage = "Recipe deleted successfully!";
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete recipe: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private string GenerateRecipeId()
+    {
+        if (!recipes.Any())
+            return "RCP001";
+
+        var maxId = recipes
+            .Select(r => r.RecipeId)
+            .Where(id => id.StartsWith("RCP") && id.Length == 6)
+            .Select(id => int.TryParse(id.Substring(3), out int num) ? num : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return $"RCP{(maxId + 1):D3}";
+    }
+
+    private string GenerateRecipeCode()
+    {
+        return GenerateRecipeId();
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        currentRecipe = new();
+        StateHasChanged();
+    }
+
+    private void ClearMessages()
+    {
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    private async void ClearMessageAfterDelay()
+    {
+        await Task.Delay(5000);
+        ClearMessages();
+        StateHasChanged();
+    }
+}

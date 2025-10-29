@@ -1,0 +1,180 @@
+﻿@page "/ingredients"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject IngredientService IngredientService
+
+<PageTitle>Ingredient Management</PageTitle>
+
+<div class="ingredient-management-container">
+    <div class="page-header">
+        <h3>Ingredient Management</h3>
+        <div class="header-actions">
+            <button class="btn btn-success" @onclick="RefreshIngredients">
+                <span class="icon">🔄</span> Refresh Data
+            </button>
+            <button class="btn btn-primary" @onclick="OpenExcelFile">
+                <span class="icon">📊</span> Open Excel
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">
+            @successMessage
+        </div>
+    }
+
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-label">Excel File Location:</div>
+            <div class="info-value">
+                <code>@filePath</code>
+            </div>
+        </div>
+        <div class="info-card">
+            <div class="info-label">Last Loaded:</div>
+            <div class="info-value">@lastLoadedTime</div>
+        </div>
+        <div class="info-card">
+            <div class="info-label">Total Ingredients:</div>
+            <div class="info-value">@filteredIngredients.Count</div>
+        </div>
+    </div>
+
+    <div class="search-box">
+        <input type="text"
+               class="form-control"
+               placeholder="Search by ID, Code, or Name..."
+               @bind="searchQuery"
+               @bind:event="oninput"
+               @onkeyup="FilterIngredients" />
+    </div>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Ingredient ID</th>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Packing Type</th>
+                    <th>Unit</th>
+                    <th>Created Date</th>
+                    <th>Last Modified</th>
+                    <th>Modified By</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (filteredIngredients.Any())
+                {
+                    @foreach (var ingredient in filteredIngredients)
+                    {
+                        <tr>
+                            <td><code>@ingredient.IngredientId</code></td>
+                            <td><code>@ingredient.IngredientCode</code></td>
+                            <td>@ingredient.IngredientName</td>
+                            <td>
+                                <span class="badge badge-info">@ingredient.PackingType</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-secondary">@ingredient.UnitOfMeasure</span>
+                            </td>
+                            <td>@ingredient.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@ingredient.LastModifiedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@ingredient.LastModifiedBy</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            @if (string.IsNullOrWhiteSpace(searchQuery))
+                            {
+                                <span>No ingredients found. Click "Open Excel" to add ingredients.</span>
+                            }
+                            else
+                            {
+                                <span>No ingredients match your search.</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<Ingredient> ingredients = new();
+    private List<Ingredient> filteredIngredients = new();
+    private string searchQuery = string.Empty;
+    private string successMessage = string.Empty;
+    private string filePath = string.Empty;
+    private string lastLoadedTime = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIngredients();
+    }
+
+    private async Task LoadIngredients()
+    {
+        ingredients = await IngredientService.GetAllIngredientsAsync();
+        filteredIngredients = ingredients;
+        filePath = IngredientService.GetFilePath();
+
+        var lastLoaded = IngredientService.GetLastLoadedTime();
+        lastLoadedTime = lastLoaded != DateTime.MinValue
+            ? lastLoaded.ToString("yyyy-MM-dd HH:mm:ss")
+            : "Not loaded yet";
+    }
+
+    private void FilterIngredients()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredIngredients = ingredients;
+        }
+        else
+        {
+            var query = searchQuery.ToLower();
+            filteredIngredients = ingredients.Where(i =>
+                i.IngredientId.ToLower().Contains(query) ||
+                i.IngredientCode.ToLower().Contains(query) ||
+                i.IngredientName.ToLower().Contains(query) ||
+                i.PackingType.ToLower().Contains(query)
+            ).ToList();
+        }
+    }
+
+    private async Task RefreshIngredients()
+    {
+        successMessage = string.Empty;
+        await LoadIngredients();
+        successMessage = "Ingredients refreshed successfully!";
+        ClearMessageAfterDelay();
+    }
+
+    private void OpenExcelFile()
+    {
+        try
+        {
+            IngredientService.OpenExcelFile();
+            successMessage = "Excel file opened successfully!";
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            successMessage = $"Failed to open Excel: {ex.Message}";
+        }
+    }
+
+    private async void ClearMessageAfterDelay()
+    {
+        await Task.Delay(5000);
+        successMessage = string.Empty;
+        StateHasChanged();
+    }
+}

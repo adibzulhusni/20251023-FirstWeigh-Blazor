@@ -1,0 +1,1077 @@
+﻿@page "/batches"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject IBatchService BatchService
+@inject RecipeService RecipeService
+@inject IJSRuntime JSRuntime
+
+<style>
+    .page-container {
+        padding: 32px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .btn-primary {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+    }
+
+        .btn-primary:hover {
+            background-color: #3a8ee6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
+        }
+
+    .search-filter-section {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        flex: 1;
+        min-width: 300px;
+        padding: 12px 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+    .filter-dropdown {
+        padding: 12px 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: white;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+        .filter-dropdown:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+    .table-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background-color: #f7fafc;
+    }
+
+    th {
+        padding: 16px;
+        text-align: left;
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    td {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+    }
+
+    tbody tr {
+        transition: background-color 0.2s;
+    }
+
+        tbody tr:hover {
+            background-color: #f7fafc;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+    .batch-code {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        color: #1a202c;
+        font-size: 14px;
+    }
+
+    .recipe-name {
+        color: #4a5568;
+    }
+
+    .repetition-text {
+        font-family: 'Roboto Mono', monospace;
+        color: #2d3748;
+    }
+
+    .operator-name {
+        color: #4a5568;
+    }
+
+    .no-operator {
+        color: #a0aec0;
+        font-style: italic;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .status-pending {
+        background-color: #feebc8;
+        color: #7c2d12;
+    }
+
+    .status-in-progress {
+        background-color: #bee3f8;
+        color: #2c5282;
+    }
+
+    .status-completed {
+        background-color: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-aborted {
+        background-color: #fed7d7;
+        color: #742a2a;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+
+    .status-pending .status-dot {
+        background-color: #dd6b20;
+    }
+
+    .status-in-progress .status-dot {
+        background-color: #3182ce;
+    }
+
+    .status-completed .status-dot {
+        background-color: #38a169;
+    }
+
+    .status-aborted .status-dot {
+        background-color: #e53e3e;
+    }
+
+    .date-text {
+        color: #718096;
+        font-size: 13px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-view {
+        background-color: #e2e8f0;
+        color: #4a5568;
+    }
+
+        .btn-view:hover {
+            background-color: #cbd5e0;
+        }
+
+    .btn-edit {
+        background-color: #bee3f8;
+        color: #2c5282;
+    }
+
+        .btn-edit:hover {
+            background-color: #90cdf4;
+        }
+
+    .btn-abort {
+        background-color: #fed7d7;
+        color: #c53030;
+    }
+
+        .btn-abort:hover {
+            background-color: #fc8181;
+        }
+
+    .btn-delete {
+        background-color: #fed7d7;
+        color: #c53030;
+    }
+
+        .btn-delete:hover {
+            background-color: #fc8181;
+        }
+
+    .btn-start {
+        background-color: #c6f6d5;
+        color: #22543d;
+    }
+
+        .btn-start:hover {
+            background-color: #9ae6b4;
+        }
+
+        .btn-start:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #718096;
+    }
+
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.3;
+    }
+
+    .empty-state-text {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-subtext {
+        font-size: 14px;
+        color: #a0aec0;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        padding: 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a202c;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #718096;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+
+        .modal-close:hover {
+            background-color: #f7fafc;
+            color: #1a202c;
+        }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 20px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        .form-control:disabled {
+            background-color: #f7fafc;
+            color: #a0aec0;
+            cursor: not-allowed;
+        }
+
+    .validation-error {
+        display: block;
+        color: #e53e3e;
+        font-size: 12px;
+        margin-top: 6px;
+    }
+
+    .btn-secondary {
+        background-color: #e2e8f0;
+        color: #4a5568;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e0;
+        }
+
+    .btn-danger {
+        background-color: #f56565;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-danger:hover {
+            background-color: #e53e3e;
+        }
+
+    .alert {
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+    }
+
+    .alert-warning {
+        background-color: #fef3c7;
+        border: 1px solid #fbbf24;
+        color: #78350f;
+    }
+
+        .alert-warning strong {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+    .loading-spinner {
+        text-align: center;
+        padding: 40px;
+        color: #718096;
+    }
+
+    @@media (max-width: 1024px) {
+        .page-container {
+            padding: 20px;
+        }
+
+        table {
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 12px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .search-filter-section {
+            flex-direction: column;
+        }
+
+        .search-box {
+            min-width: 100%;
+        }
+
+        .table-card {
+            overflow-x: auto;
+        }
+
+        table {
+            min-width: 1100px;
+        }
+    }
+</style>
+
+<div class="page-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">Batch Management</h1>
+        <button class="btn-primary" @onclick="OpenCreateModal">+ Create Batch</button>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="search-filter-section">
+        <input type="text" class="search-box" placeholder="Search batches by code or recipe..."
+               @bind="searchText" @bind:after="ApplyFilters">
+
+        <select class="filter-dropdown" @bind="filterStatus" @bind:after="ApplyFilters">
+            <option value="">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="InProgress">In Progress</option>
+            <option value="Completed">Completed</option>
+            <option value="Aborted">Aborted</option>
+        </select>
+
+        <select class="filter-dropdown" @bind="filterRecipeId" @bind:after="ApplyFilters">
+            <option value="">All Recipes</option>
+            @foreach (var recipe in recipes)
+            {
+                <option value="@recipe.RecipeId">@recipe.RecipeName</option>
+            }
+        </select>
+    </div>
+
+    <!-- Batches Table -->
+    <div class="table-card">
+        @if (isLoading)
+        {
+            <div class="loading-spinner">Loading batches...</div>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr>
+                        <th>Batch Code</th>
+                        <th>Recipe</th>
+                        <th>Status</th>
+                        <th>Repetitions</th>
+                        <th>Operator</th>
+                        <th>Created Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!filteredBatches.Any())
+                    {
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">📦</div>
+                                    <div class="empty-state-text">No batches found</div>
+                                    <div class="empty-state-subtext">Click "+ Create Batch" to start a new production batch</div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var batch in filteredBatches)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="batch-code">@batch.BatchId</span>
+                                </td>
+                                <td>
+                                    <span class="recipe-name">@batch.RecipeName</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-@(batch.Status == "InProgress" ? "in-progress" : batch.Status.ToLower())">
+                                        <span class="status-dot"></span>
+                                        @(batch.Status == "InProgress" ? "In Progress" : batch.Status)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="repetition-text">@batch.CurrentRepetition / @batch.TotalRepetitions</span>
+                                </td>
+                                <td>
+                                    @if (string.IsNullOrEmpty(batch.StartedBy))
+                                    {
+                                        <span class="no-operator">Not assigned</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="operator-name">@batch.StartedBy</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="date-text">@batch.CreatedDate.ToString("MMM dd, yyyy HH:mm")</span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action btn-view" @onclick="() => ViewBatchDetails(batch)">View</button>
+                                        @if (batch.Status == "Pending")
+                                        {
+                                            <button class="btn-action btn-start" @onclick="() => StartBatch(batch.BatchId)"
+                                                    disabled="@(!canStartNewBatch)">
+                                                Start
+                                            </button>
+                                            <button class="btn-action btn-edit" @onclick="() => OpenEditModal(batch)">Edit</button>
+                                            <button class="btn-action btn-delete" @onclick="() => ConfirmDelete(batch.BatchId)">Delete</button>
+                                        }
+                                        else if (batch.Status == "InProgress")
+                                        {
+                                            <button class="btn-action btn-abort" @onclick="() => OpenAbortModal(batch)">Abort</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">@(isEditMode ? "Edit Batch" : "Create New Batch")</h2>
+                <button class="modal-close" @onclick="CloseModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Recipe *</label>
+                    <select class="form-control" @bind="currentBatch.RecipeId" disabled="@isEditMode">
+                        <option value="">-- Select Recipe --</option>
+                        @foreach (var recipe in recipes)
+                        {
+                            <option value="@recipe.RecipeId">@recipe.RecipeName (@recipe.RecipeCode)</option>
+                        }
+                    </select>
+                    @if (showValidation && string.IsNullOrEmpty(currentBatch.RecipeId))
+                    {
+                        <span class="validation-error">Recipe is required</span>
+                    }
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Number of Repetitions *</label>
+                    <div class="form-group">
+                        <label class="form-label">Planned Start Time</label>
+                        <input type="datetime-local" class="form-control" @bind="currentBatch.PlannedStartTime" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Planned End Time</label>
+                        <input type="datetime-local" class="form-control" @bind="currentBatch.PlannedEndTime" />
+                    </div>
+                    <input type="number" class="form-control" @bind="currentBatch.TotalRepetitions" min="1" max="999" />
+                    @if (showValidation && currentBatch.TotalRepetitions <= 0)
+                    {
+                        <span class="validation-error">Must be at least 1</span>
+                    }
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Created By</label>
+                    <input type="text" class="form-control" @bind="currentBatch.CreatedBy"
+                           placeholder="Operator name" disabled="@isEditMode" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" @bind="currentBatch.Notes" rows="3"
+                              placeholder="Optional notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseModal">Cancel</button>
+                <button class="btn-primary" @onclick="SaveBatch">
+                    @(isEditMode ? "Update Batch" : "Create Batch")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Abort Modal -->
+@if (showAbortModal)
+{
+    <div class="modal-overlay" @onclick="CloseAbortModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2 class="modal-title">⚠️ Abort Batch</h2>
+                <button class="modal-close" @onclick="CloseAbortModal">×</button>
+            </div>
+            <div class="modal-body">
+                @if (batchToAbort?.RequiresSupervisorApproval == true)
+                {
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Supervisor Approval Required</strong>
+                        <p>This batch is @batchToAbort.ProgressPercentage.ToString("F0")% complete (>40%). A supervisor must approve this abort.</p>
+                    </div>
+                }
+
+                <p style="margin-bottom: 16px;">Are you sure you want to abort batch <strong>@batchToAbort?.BatchId</strong>?</p>
+
+                <div class="form-group">
+                    <label class="form-label">Abort Reason *</label>
+                    <textarea class="form-control" @bind="abortReason" rows="4"
+                              placeholder="Please explain why this batch is being aborted..."></textarea>
+                    @if (showValidation && string.IsNullOrEmpty(abortReason))
+                    {
+                        <span class="validation-error">Abort reason is required</span>
+                    }
+                </div>
+
+                @if (batchToAbort?.RequiresSupervisorApproval == true)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Supervisor Name *</label>
+                        <input type="text" class="form-control" @bind="supervisorName"
+                               placeholder="Enter supervisor name" />
+                        @if (showValidation && string.IsNullOrEmpty(supervisorName))
+                        {
+                            <span class="validation-error">Supervisor approval is required</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="form-group">
+                        <label class="form-label">Aborted By</label>
+                        <input type="text" class="form-control" @bind="abortedBy" placeholder="Your name" />
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseAbortModal">Cancel</button>
+                <button class="btn-danger" @onclick="ConfirmAbort">Abort Batch</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal)
+{
+    <div class="modal-overlay" @onclick="CloseDeleteModal">
+        <div class="modal-content" @onclick:stopPropagation="true" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Delete Batch</h2>
+                <button class="modal-close" @onclick="CloseDeleteModal">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete batch <strong>@batchToDelete</strong>?</p>
+                <p style="color: #a0aec0; font-size: 13px; margin-top: 8px;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseDeleteModal">Cancel</button>
+                <button class="btn-danger" @onclick="ConfirmDeleteBatch">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- View Details Modal -->
+@if (showDetailsModal && selectedBatch != null)
+{
+    <div class="modal-overlay" @onclick="CloseDetailsModal">
+        <div class="modal-content" @onclick:stopPropagation="true" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Batch Details - @selectedBatch.BatchId</h2>
+                <button class="modal-close" @onclick="CloseDetailsModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                    <div>
+                        <label class="form-label">Batch Code</label>
+                        <div class="batch-code">@selectedBatch.BatchId</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Recipe</label>
+                        <div>@selectedBatch.RecipeName</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Status</label>
+                        <div>
+                            <span class="status-badge status-@(selectedBatch.Status == "InProgress" ? "in-progress" : selectedBatch.Status.ToLower())">
+                                <span class="status-dot"></span>
+                                @(selectedBatch.Status == "InProgress" ? "In Progress" : selectedBatch.Status)
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">Progress</label>
+                        <div>@selectedBatch.CurrentRepetition / @selectedBatch.TotalRepetitions repetitions (@selectedBatch.ProgressPercentage.ToString("F0")%)</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Created By</label>
+                        <div>@selectedBatch.CreatedBy</div>
+                    </div>
+                    <div>
+                        <label class="form-label">Created Date</label>
+                        <div>@selectedBatch.CreatedDate.ToString("MMM dd, yyyy HH:mm:ss")</div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(selectedBatch.StartedBy))
+                    {
+                        <div>
+                            <label class="form-label">Started By</label>
+                            <div>@selectedBatch.StartedBy</div>
+                        </div>
+                        <div>
+                            <label class="form-label">Started Date</label>
+                            <div>@selectedBatch.StartedDate?.ToString("MMM dd, yyyy HH:mm:ss")</div>
+                        </div>
+                    }
+                    @if (selectedBatch.CompletedDate.HasValue)
+                    {
+                        <div>
+                            <label class="form-label">Completed Date</label>
+                            <div>@selectedBatch.CompletedDate?.ToString("MMM dd, yyyy HH:mm:ss")</div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(selectedBatch.AbortedBy))
+                    {
+                        <div>
+                            <label class="form-label">Aborted By</label>
+                            <div>@selectedBatch.AbortedBy</div>
+                        </div>
+                        <div>
+                            <label class="form-label">Aborted Date</label>
+                            <div>@selectedBatch.AbortedDate?.ToString("MMM dd, yyyy HH:mm:ss")</div>
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <label class="form-label">Abort Reason</label>
+                            <div>@selectedBatch.AbortReason</div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(selectedBatch.Notes))
+                    {
+                        <div style="grid-column: 1 / -1;">
+                            <label class="form-label">Notes</label>
+                            <div>@selectedBatch.Notes</div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseDetailsModal">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Batch> allBatches = new();
+    private List<Batch> filteredBatches = new();
+    private List<Recipe> recipes = new();
+
+    private bool isLoading = true;
+    private bool showModal = false;
+    private bool showAbortModal = false;
+    private bool showDeleteModal = false;
+    private bool showDetailsModal = false;
+    private bool showValidation = false;
+    private bool isEditMode = false;
+    private bool canStartNewBatch = true;
+
+    private Batch currentBatch = new();
+    private Batch? batchToAbort;
+    private Batch? selectedBatch;
+    private string batchToDelete = "";
+
+    private string filterStatus = "";
+    private string filterRecipeId = "";
+    private string searchText = "";
+
+    private string abortReason = "";
+    private string supervisorName = "";
+    private string abortedBy = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        allBatches = await BatchService.GetAllBatchesAsync();
+        recipes = await RecipeService.GetAllRecipesAsync();
+
+        // Sort by created date descending (newest first)
+        allBatches = allBatches.OrderByDescending(b => b.CreatedDate).ToList();
+
+        ApplyFilters();
+
+        canStartNewBatch = await BatchService.CanStartBatch();
+        isLoading = false;
+    }
+
+    private void ApplyFilters()
+    {
+        filteredBatches = allBatches;
+
+        // Filter by status
+        if (!string.IsNullOrEmpty(filterStatus))
+        {
+            filteredBatches = filteredBatches.Where(b => b.Status == filterStatus).ToList();
+        }
+
+        // Filter by recipe
+        if (!string.IsNullOrEmpty(filterRecipeId))
+        {
+            filteredBatches = filteredBatches.Where(b => b.RecipeId == filterRecipeId).ToList();
+        }
+
+        // Search by batch code or recipe name
+        if (!string.IsNullOrEmpty(searchText))
+        {
+            filteredBatches = filteredBatches
+                .Where(b => b.BatchId.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                            b.RecipeName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        currentBatch = new Batch
+        {
+            TotalRepetitions = 1,
+            CreatedBy = "Operator" // Default, should be from logged-in user
+        };
+        isEditMode = false;
+        showValidation = false;
+        showModal = true;
+    }
+
+    private void OpenEditModal(Batch batch)
+    {
+        currentBatch = new Batch
+        {
+            BatchId = batch.BatchId,
+            RecipeId = batch.RecipeId,
+            RecipeName = batch.RecipeName,
+            TotalRepetitions = batch.TotalRepetitions,
+            CreatedBy = batch.CreatedBy,
+            Notes = batch.Notes
+        };
+        isEditMode = true;
+        showValidation = false;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        showValidation = false;
+    }
+
+    private async Task SaveBatch()
+    {
+        showValidation = true;
+
+        // Validation
+        if (string.IsNullOrEmpty(currentBatch.RecipeId) || currentBatch.TotalRepetitions <= 0)
+        {
+            return;
+        }
+
+        if (isEditMode)
+        {
+            await BatchService.UpdateBatchAsync(currentBatch);
+        }
+        else
+        {
+            await BatchService.CreateBatchAsync(currentBatch);
+        }
+
+        await LoadData();
+        CloseModal();
+    }
+
+    private async Task StartBatch(string batchId)
+    {
+        var success = await BatchService.StartBatchAsync(batchId, "Operator"); // Should use logged-in user
+        if (success)
+        {
+            await LoadData();
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Cannot start batch. Maximum 5 batches can be in progress.");
+        }
+    }
+
+    private void OpenAbortModal(Batch batch)
+    {
+        batchToAbort = batch;
+        abortReason = "";
+        supervisorName = "";
+        abortedBy = "Operator"; // Should use logged-in user
+        showValidation = false;
+        showAbortModal = true;
+    }
+
+    private void CloseAbortModal()
+    {
+        showAbortModal = false;
+        batchToAbort = null;
+        showValidation = false;
+    }
+
+    private async Task ConfirmAbort()
+    {
+        if (batchToAbort == null) return;
+
+        showValidation = true;
+
+        // Validation
+        if (string.IsNullOrEmpty(abortReason))
+        {
+            return;
+        }
+
+        if (batchToAbort.RequiresSupervisorApproval && string.IsNullOrEmpty(supervisorName))
+        {
+            return;
+        }
+
+        var abortBy = batchToAbort.RequiresSupervisorApproval ? supervisorName : abortedBy;
+        var success = await BatchService.AbortBatchAsync(batchToAbort.BatchId, abortBy, abortReason);
+
+        if (success)
+        {
+            await LoadData();
+            CloseAbortModal();
+        }
+    }
+
+    private void ConfirmDelete(string batchId)
+    {
+        batchToDelete = batchId;
+        showDeleteModal = true;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        batchToDelete = "";
+    }
+
+    private async Task ConfirmDeleteBatch()
+    {
+        await BatchService.DeleteBatchAsync(batchToDelete);
+        await LoadData();
+        CloseDeleteModal();
+    }
+
+    private void ViewBatchDetails(Batch batch)
+    {
+        selectedBatch = batch;
+        showDetailsModal = true;
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedBatch = null;
+    }
+}

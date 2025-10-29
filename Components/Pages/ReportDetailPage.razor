@@ -1,0 +1,624 @@
+﻿// ReportDetailPage.razor
+
+@page "/report/{RecordId}"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject ReportService ReportService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Report Detail - FirstWeigh</PageTitle>
+
+<style>
+    .report-container {
+        padding: 32px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .report-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .back-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #e2e8f0;
+        color: #2d3748;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+        .back-button:hover {
+            background-color: #cbd5e0;
+        }
+
+    .report-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn-print {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-export {
+        background-color: #48bb78;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .report-content {
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .report-title-section {
+        text-align: center;
+        padding-bottom: 24px;
+        border-bottom: 3px solid #4a9eff;
+        margin-bottom: 32px;
+    }
+
+    .report-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .report-subtitle {
+        font-size: 16px;
+        color: #718096;
+    }
+
+    .report-id {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 18px;
+        color: #4a9eff;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 24px;
+        margin-bottom: 32px;
+    }
+
+    .info-box {
+        padding: 16px;
+        background: #f7fafc;
+        border-radius: 8px;
+        border-left: 4px solid #4a9eff;
+    }
+
+    .info-label {
+        font-size: 12px;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .info-value {
+        font-size: 16px;
+        color: #1a202c;
+        font-weight: 600;
+    }
+
+    .info-value-mono {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 18px;
+        color: #1a202c;
+        font-weight: 700;
+    }
+
+    .status-badge-large {
+        display: inline-block;
+        padding: 8px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .status-completed {
+        background-color: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-aborted {
+        background-color: #fed7d7;
+        color: #742a2a;
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2d3748;
+        margin: 32px 0 16px 0;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .quality-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .quality-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+        .quality-card.green {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+
+        .quality-card.orange {
+            background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+        }
+
+        .quality-card.blue {
+            background: linear-gradient(135deg, #4a9eff 0%, #3a8ee6 100%);
+        }
+
+    .quality-label {
+        font-size: 12px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+
+    .quality-value {
+        font-size: 36px;
+        font-weight: 700;
+        font-family: 'Roboto Mono', monospace;
+    }
+
+    .details-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 32px;
+    }
+
+        .details-table thead {
+            background: linear-gradient(135deg, #4a9eff, #3a8ee6);
+            color: white;
+        }
+
+        .details-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .details-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+
+        .details-table tbody tr:hover {
+            background-color: #f7fafc;
+        }
+
+        .details-table tbody tr:nth-child(even) {
+            background-color: #fafbfc;
+        }
+
+    .rep-header {
+        background-color: #edf2f7 !important;
+        font-weight: 700;
+        color: #2d3748;
+    }
+
+    .ingredient-code {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 700;
+        color: #4a9eff;
+    }
+
+    .weight-value {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+    }
+
+    .deviation-positive {
+        color: #38a169;
+    }
+
+    .deviation-negative {
+        color: #e53e3e;
+    }
+
+    .tolerance-ok {
+        color: #38a169;
+        font-weight: 700;
+    }
+
+    .tolerance-fail {
+        color: #e53e3e;
+        font-weight: 700;
+    }
+
+    .abort-notice {
+        background-color: #fed7d7;
+        border-left: 4px solid #e53e3e;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+    }
+
+    .abort-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #742a2a;
+        margin-bottom: 8px;
+    }
+
+    .abort-details {
+        font-size: 14px;
+        color: #742a2a;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 60px;
+        color: #718096;
+    }
+
+    .error-state {
+        text-align: center;
+        padding: 60px;
+    }
+
+    .error-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+    }
+
+    .error-text {
+        font-size: 18px;
+        color: #e53e3e;
+        font-weight: 600;
+    }
+
+    @@media print {
+        .report-header, .report-actions
+
+    {
+        display: none;
+    }
+
+    .report-container {
+        padding: 0;
+    }
+
+    .report-content {
+        box-shadow: none;
+    }
+
+    }
+</style>
+
+<div class="report-container">
+    @if (isLoading)
+    {
+        <div class="loading">
+            <p>⏳ Loading report...</p>
+        </div>
+    }
+    else if (report == null)
+    {
+        <div class="error-state">
+            <div class="error-icon">❌</div>
+            <div class="error-text">Report not found</div>
+            <br />
+            <a href="/reports" class="back-button">← Back to Reports</a>
+        </div>
+    }
+    else
+    {
+        <!-- Header with Actions -->
+        <div class="report-header">
+            <a href="/reports" class="back-button">
+                ← Back to Reports
+            </a>
+            <div class="report-actions">
+                <button class="btn-print" @onclick="PrintReport">
+                    🖨️ Print
+                </button>
+                <button class="btn-export" @onclick="ExportToExcel">
+                    📊 Export Excel
+                </button>
+            </div>
+        </div>
+
+        <!-- Report Content -->
+        <div class="report-content">
+            <!-- Title Section -->
+            <div class="report-title-section">
+                <h1 class="report-title">Batch Weighing Report</h1>
+                <p class="report-subtitle">FirstWeigh Blind Weighing System</p>
+                <div class="report-id">@report.RecordId</div>
+            </div>
+
+            <!-- Batch Information Grid -->
+            <div class="info-grid">
+                <div class="info-box">
+                    <div class="info-label">Batch ID</div>
+                    <div class="info-value-mono">@report.BatchId</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Recipe</div>
+                    <div class="info-value">@report.RecipeName</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Recipe Code</div>
+                    <div class="info-value-mono">@report.RecipeCode</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Operator</div>
+                    <div class="info-value">@report.OperatorName</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Start Time</div>
+                    <div class="info-value">@report.SessionStartTime.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">End Time</div>
+                    <div class="info-value">@(report.SessionEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A")</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Duration</div>
+                    <div class="info-value">@FormatDuration(report.Duration)</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Status</div>
+                    <div>
+                        <span class="status-badge-large @GetStatusClass(report.Status)">
+                            @report.Status
+                        </span>
+                    </div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Repetitions</div>
+                    <div class="info-value">@report.CompletedRepetitions of @report.TotalRepetitions</div>
+                </div>
+            </div>
+
+            <!-- Abort Notice (if applicable) -->
+            @if (report.Status == "Aborted")
+            {
+                <div class="abort-notice">
+                    <div class="abort-title">⚠️ Batch Aborted</div>
+                    <div class="abort-details">
+                        <strong>Reason:</strong> @report.AbortReason<br />
+                        <strong>Aborted By:</strong> @report.AbortedBy<br />
+                        <strong>Date:</strong> @report.AbortedDate?.ToString("yyyy-MM-dd HH:mm:ss")
+                    </div>
+                </div>
+            }
+
+            <!-- Quality Summary -->
+            <h2 class="section-title">📊 Quality Metrics</h2>
+            <div class="quality-summary">
+                <div class="quality-card blue">
+                    <div class="quality-label">Total Ingredients</div>
+                    <div class="quality-value">@report.TotalIngredientsWeighed</div>
+                </div>
+                <div class="quality-card green">
+                    <div class="quality-label">Within Tolerance</div>
+                    <div class="quality-value">@report.IngredientsWithinTolerance</div>
+                </div>
+                <div class="quality-card orange">
+                    <div class="quality-label">Out of Tolerance</div>
+                    <div class="quality-value">@report.IngredientsOutOfTolerance</div>
+                </div>
+                <div class="quality-card @GetComplianceCardClass(report.CompliancePercentage)">
+                    <div class="quality-label">Compliance Rate</div>
+                    <div class="quality-value">@report.CompliancePercentage.ToString("F1")%</div>
+                </div>
+                <div class="quality-card blue">
+                    <div class="quality-label">Avg Deviation</div>
+                    <div class="quality-value">±@report.AverageDeviation.ToString("F3")</div>
+                </div>
+                <div class="quality-card orange">
+                    <div class="quality-label">Max Deviation</div>
+                    <div class="quality-value">±@report.MaxDeviation.ToString("F3")</div>
+                </div>
+            </div>
+
+            <!-- Detailed Ingredient Table -->
+            <h2 class="section-title">📋 Detailed Weighing Records</h2>
+            @if (!details.Any())
+            {
+                <p style="color: #718096; text-align: center; padding: 20px;">No ingredient details recorded.</p>
+            }
+            else
+            {
+                <table class="details-table">
+                    <thead>
+                        <tr>
+                            <th>Rep</th>
+                            <th>Seq</th>
+                            <th>Ingredient Code</th>
+                            <th>Ingredient Name</th>
+                            <th>Target (kg)</th>
+                            <th>Actual (kg)</th>
+                            <th>Deviation (kg)</th>
+                            <th>Tolerance</th>
+                            <th>Status</th>
+                            <th>Bowl</th>
+                            <th>Scale</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            int currentRep = 0;
+                        }
+                        @foreach (var detail in details.OrderBy(d => d.RepetitionNumber).ThenBy(d => d.IngredientSequence))
+                        {
+                            @if (detail.RepetitionNumber != currentRep)
+                            {
+                                currentRep = detail.RepetitionNumber;
+                                <tr class="rep-header">
+                                    <td colspan="12" style="font-weight: 700; color: #2d3748;">
+                                        🔄 REPETITION @currentRep
+                                    </td>
+                                </tr>
+                            }
+                            <tr>
+                                <td>@detail.RepetitionNumber</td>
+                                <td>@detail.IngredientSequence</td>
+                                <td>
+                                    <span class="ingredient-code">@detail.IngredientCode</span>
+                                </td>
+                                <td>@detail.IngredientName</td>
+                                <td>
+                                    <span class="weight-value">@detail.TargetWeight.ToString("F3")</span>
+                                </td>
+                                <td>
+                                    <span class="weight-value">@detail.ActualWeight.ToString("F3")</span>
+                                </td>
+                                <td>
+                                    <span class="weight-value @(detail.Deviation >= 0 ? "deviation-positive" : "deviation-negative")">
+                                        @(detail.Deviation >= 0 ? "+" : "")@detail.Deviation.ToString("F3")
+                                    </span>
+                                </td>
+                                <td>@detail.MinWeight.ToString("F3") - @detail.MaxWeight.ToString("F3")</td>
+                                <td>
+                                    <span class="@(detail.IsWithinTolerance ? "tolerance-ok" : "tolerance-fail")">
+                                        @(detail.IsWithinTolerance ? "✓ OK" : "⚠ OUT")
+                                    </span>
+                                </td>
+                                <td>@detail.BowlCode</td>
+                                <td>Scale @detail.ScaleNumber</td>
+                                <td>@detail.Timestamp.ToString("HH:mm:ss")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <!-- Footer -->
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #718096; font-size: 12px;">
+                <p>FirstWeigh Blind Weighing System | Report Generated: @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")</p>
+                <p>This report is automatically generated and does not require a signature.</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string RecordId { get; set; } = string.Empty;
+
+    private WeighingRecord? report;
+    private List<WeighingDetail> details = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        isLoading = true;
+
+        try
+        {
+            report = await ReportService.GetRecordByIdAsync(RecordId);
+
+            if (report != null)
+            {
+                details = await ReportService.GetDetailsByRecordIdAsync(RecordId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading report: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void PrintReport()
+    {
+        // Trigger browser print dialog
+        _ = JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private async Task ExportToExcel()
+    {
+        // TODO: Implement Excel export functionality
+        await JSRuntime.InvokeVoidAsync("alert", "Excel export coming soon!");
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "Completed" => "status-completed",
+            "Aborted" => "status-aborted",
+            _ => ""
+        };
+    }
+
+    private string GetComplianceCardClass(decimal compliance)
+    {
+        if (compliance >= 95) return "green";
+        if (compliance >= 85) return "orange";
+        return "orange";
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return $"{duration.Hours}h {duration.Minutes}m {duration.Seconds}s";
+        if (duration.TotalMinutes >= 1)
+            return $"{duration.Minutes}m {duration.Seconds}s";
+        return $"{duration.Seconds}s";
+    }
+}
