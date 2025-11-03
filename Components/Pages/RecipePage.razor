@@ -3,6 +3,7 @@
 @using FirstWeigh.Services
 @inject RecipeService RecipeService
 @inject IngredientService IngredientService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Recipe Management</PageTitle>
 
@@ -570,8 +571,14 @@
     <!-- Page Header -->
     <div class="page-header">
         <h1 class="page-title">Recipe Management</h1>
-        <button class="btn-primary" @onclick="OpenCreateModal">+ Add Recipe</button>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-secondary" @onclick="DownloadTemplate">📥 Download Template</button>
+            <button class="btn-secondary" @onclick="TriggerFileUpload">📤 Import from Excel</button>
+            <button class="btn-primary" @onclick="OpenCreateModal">+ Add Recipe</button>
+        </div>
     </div>
+    <!-- Hidden file input - place this right after the page-header div -->
+    <InputFile id="recipeFileUpload" OnChange="HandleFileUpload" accept=".xlsx,.xls" style="display: none;" />
 
     @if (!string.IsNullOrEmpty(successMessage))
     {
@@ -807,6 +814,7 @@
     private bool isEditMode = false;
     private bool isViewMode = false;
     private Recipe currentRecipe = new();
+    private bool isUploading = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -848,6 +856,113 @@
                            r.RecipeName.ToLower().Contains(term))
                 .OrderByDescending(r => r.CreatedDate)
                 .ToList();
+        }
+    }
+    private async Task TriggerFileUpload()
+    {
+        Console.WriteLine("🔵 TriggerFileUpload clicked!");
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('recipeFileUpload').click()");
+            Console.WriteLine("✅ File dialog should open");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error: {ex.Message}");
+            errorMessage = $"Error opening file dialog: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        ClearMessages();
+        var file = e.File;
+
+        if (file == null)
+            return;
+
+        if (!file.Name.EndsWith(".xlsx") && !file.Name.EndsWith(".xls"))
+        {
+            errorMessage = "Please upload a valid Excel file (.xlsx or .xls)";
+            StateHasChanged();
+            return;
+        }
+
+        isUploading = true;
+        successMessage = "Uploading file...";
+        StateHasChanged();
+
+        try
+        {
+            // Read file into memory stream
+            using var memoryStream = new MemoryStream();
+            await file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            successMessage = "Processing Excel file...";
+            StateHasChanged();
+
+            // Parse and import
+            var result = await RecipeService.ImportRecipesFromExcelAsync(memoryStream, availableIngredients);
+
+            if (result.Success)
+            {
+                successMessage = $"✅ Successfully imported {result.RecipesImported} recipe(s) with {result.IngredientsImported} ingredient(s)!";
+
+                if (result.Warnings.Any())
+                {
+                    successMessage += $"\n⚠️ {result.Warnings.Count} warning(s) - check console";
+                    foreach (var warning in result.Warnings)
+                    {
+                        Console.WriteLine($"⚠️ {warning}");
+                    }
+                }
+
+                await LoadData();
+            }
+            else
+            {
+                errorMessage = $"Import failed: {result.ErrorMessage}";
+                if (result.Warnings.Any())
+                {
+                    foreach (var warning in result.Warnings)
+                    {
+                        Console.WriteLine($"⚠️ {warning}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error uploading file: {ex.Message}";
+            Console.WriteLine($"Upload error: {ex}");
+        }
+        finally
+        {
+            isUploading = false;
+            StateHasChanged();
+            ClearMessageAfterDelay();
+        }
+    }
+
+    private async Task DownloadTemplate()
+    {
+        try
+        {
+            var templatePath = await RecipeService.CreateImportTemplateAsync(availableIngredients);
+            successMessage = "Template created! Opening file...";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = templatePath,
+                UseShellExecute = true
+            });
+            ClearMessageAfterDelay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating template: {ex.Message}";
         }
     }
 
@@ -947,6 +1062,9 @@
             recipeIngredient.Unit = ingredient.UnitOfMeasure;
         }
     }
+
+    private InputFile? fileUploadComponent;
+   
 
     private async Task SaveRecipe()
     {
