@@ -1,0 +1,45 @@
+﻿@using FirstWeigh.Services
+@inject AuthenticationService AuthService
+@inject NavigationManager Navigation
+
+@if (isLoading)
+{
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+        <p>Loading...</p>
+    </div>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private bool isLoading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Try to restore session
+            var sessionRestored = await AuthService.RestoreSessionAsync();
+
+            // If we're on login page and session was restored, redirect to dashboard
+            var currentPath = new Uri(Navigation.Uri).AbsolutePath;
+            if (sessionRestored && currentPath == "/login")
+            {
+                Navigation.NavigateTo("/");
+            }
+            // If no session and not on login page, redirect to login
+            else if (!sessionRestored && currentPath != "/login")
+            {
+                Navigation.NavigateTo("/login");
+            }
+
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

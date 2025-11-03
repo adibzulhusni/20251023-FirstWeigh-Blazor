@@ -94,5 +94,25 @@
                 _ => new UserPermissions()
             };
         }
+        // Add this class at the end of your User.cs file
+
+        /// <summary>
+        /// Lightweight class to hold current authenticated user information
+        /// </summary>
+        public class CurrentUserInfo
+        {
+            public string Username { get; set; } = string.Empty;
+            public string Role { get; set; } = string.Empty;
+            public DateTime LoginTime { get; set; } = DateTime.Now;
+
+            public CurrentUserInfo() { }
+
+            public CurrentUserInfo(string username, string role)
+            {
+                Username = username;
+                Role = role;
+                LoginTime = DateTime.Now;
+            }
+        }
     }
 }

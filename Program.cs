@@ -9,7 +9,9 @@ namespace _20251013_FirstWeigh_Blazor
         {
             var builder = WebApplication.CreateBuilder(args);
             // Register UserService
-            builder.Services.AddSingleton<UserService>();
+            builder.Services.AddScoped<UserService>();
+            // Add this line:
+            builder.Services.AddScoped<BrowserStorageService>();
             // Register IngredientService
             builder.Services.AddSingleton<IngredientService>();
             // Register BowlService
@@ -21,6 +23,8 @@ namespace _20251013_FirstWeigh_Blazor
             builder.Services.AddScoped<IBatchService, BatchService>();
             builder.Services.AddScoped<IWeighingService, WeighingService>();
             builder.Services.AddSingleton<ReportService>();
+            // Add this line where you register services:
+            builder.Services.AddScoped<AuthenticationService>();
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
