@@ -121,64 +121,76 @@ namespace FirstWeigh.Services
                 throw new InvalidOperationException("Not connected to PLC");
             }
 
-            while (!cancellationToken.IsCancellationRequested)
+            Console.WriteLine("🔄 Starting Modbus polling...");
+
+            try
             {
-                try
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    // Read Scale 1 from its register
-                    if (Scale1Connected)
+                    try
                     {
-                        try
+                        // Read Scale 1
+                        if (Scale1Connected)
                         {
-                            Scale1Weight = await ReadScaleWeightAsync(_scale1RegisterAddress);
+                            try
+                            {
+                                Scale1Weight = await ReadScaleWeightAsync(_scale1RegisterAddress);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error reading Scale 1: {ex.Message}");
+                                Scale1Weight = 0;
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error reading Scale 1: {ex.Message}");
-                            Scale1Weight = 0;
-                        }
-                    }
 
-                    // Read Scale 2 from its register
-                    if (Scale2Connected)
+                        // Read Scale 2
+                        if (Scale2Connected)
+                        {
+                            try
+                            {
+                                Scale2Weight = await ReadScaleWeightAsync(_scale2RegisterAddress);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error reading Scale 2: {ex.Message}");
+                                Scale2Weight = 0;
+                            }
+                        }
+
+                        // Notify listeners
+                        WeightUpdated?.Invoke(Scale1Weight, Scale2Weight);
+
+                        // Wait before next reading (500ms = 2 readings per second)
+                        await Task.Delay(500, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
                     {
-                        try
-                        {
-                            Scale2Weight = await ReadScaleWeightAsync(_scale2RegisterAddress);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error reading Scale 2: {ex.Message}");
-                            Scale2Weight = 0;
-                        }
-                    }
-
-                    // Notify listeners
-                    WeightUpdated?.Invoke(Scale1Weight, Scale2Weight);
-
-                    // Wait before next reading (500ms = 2 readings per second)
-                    await Task.Delay(500, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    // ✅ FIXED: This is expected when cancellation is requested - exit cleanly
-                    Console.WriteLine("⏹️ Modbus reading stopped (cancelled)");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    // ⚠️ Only catch unexpected errors
-                    Console.WriteLine($"❌ Unexpected error reading scales: {ex.Message}");
-
-                    // Check if we should still continue
-                    if (cancellationToken.IsCancellationRequested)
+                        // ✅ Expected - cancellation requested, exit cleanly
+                        Console.WriteLine("⏹️ Modbus polling cancelled");
                         break;
+                    }
+                    catch (Exception ex)
+                    {
+                        // ⚠️ Unexpected error - log and retry
+                        Console.WriteLine($"❌ Unexpected error in Modbus loop: {ex.Message}");
 
-                    await Task.Delay(1000, cancellationToken);
+                        // Check if cancelled before retrying
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        await Task.Delay(1000, cancellationToken);
+                    }
                 }
             }
-
-            Console.WriteLine("✅ Modbus reading loop exited");
+            catch (OperationCanceledException)
+            {
+                // Normal cancellation at outer level
+                Console.WriteLine("⏹️ Modbus polling stopped");
+            }
+            finally
+            {
+                Console.WriteLine("✅ Modbus polling loop exited cleanly");
+            }
         }
 
         private async Task<decimal> ReadScaleWeightAsync(ushort registerAddress)

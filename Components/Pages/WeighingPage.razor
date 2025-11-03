@@ -797,7 +797,7 @@
                     @if (isInTransferStage)
                     {
                         <div style="margin-top: 24px; padding: 20px; background: @(transferWeightMatches ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fff3cd, #ffeaa7)");
-                                                border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
+                                                            border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
                             <div style="text-align: center;">
                                 <div style="font-size: 32px; margin-bottom: 8px;">
                                     @(transferWeightMatches ? "✅" : "⏳")
@@ -815,8 +815,8 @@
                                 disabled="@(!transferWeightMatches)"
                                 @onclick="ConfirmTransfer"
                                 style="margin-top: 20px; background: @(transferWeightMatches ? "#28a745" : "#cbd5e0");
-                                                   cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
-                                                   opacity: @(transferWeightMatches ? "1" : "0.5");">
+                                                               cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
+                                                               opacity: @(transferWeightMatches ? "1" : "0.5");">
                             @(transferWeightMatches ? "✓ COMPLETE TRANSFER" : "⏳ WAITING FOR CORRECT WEIGHT...")
                         </button>
                     }
@@ -873,8 +873,8 @@
                 </p>
 
                 <div style="padding: 20px; border-radius: 12px; margin-bottom: 24px;
-                                background: @(isScale2Clear ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fed7d7, #fc8181)");
-                                border: 3px solid @(isScale2Clear ? "#48bb78" : "#f56565");">
+                                    background: @(isScale2Clear ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fed7d7, #fc8181)");
+                                    border: 3px solid @(isScale2Clear ? "#48bb78" : "#f56565");">
                     <div style="font-size: 32px; margin-bottom: 8px;">
                         @(isScale2Clear ? "✅" : "⚠️")
                     </div>
@@ -892,9 +892,9 @@
                         @onclick="CompleteBowlRemoval"
                         disabled="@(!isScale2Clear)"
                         style="background: @(isScale2Clear ? "#28a745" : "#cbd5e0");
-                                   padding: 12px 32px;
-                                   cursor: @(isScale2Clear ? "pointer" : "not-allowed");
-                                   opacity: @(isScale2Clear ? "1" : "0.6");">
+                                       padding: 12px 32px;
+                                       cursor: @(isScale2Clear ? "pointer" : "not-allowed");
+                                       opacity: @(isScale2Clear ? "1" : "0.6");">
                     @(isScale2Clear ? "✓ Complete Batch" : "⏳ Waiting...")
                 </button>
             </div>
@@ -1119,12 +1119,33 @@
     {
         if (!isModbusReading) return;
 
-        ModbusService.WeightUpdated -= OnWeightUpdated;
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource?.Dispose();
-        _cancellationTokenSource = null;
-        isModbusReading = false;
-        StateHasChanged();
+        try
+        {
+            Console.WriteLine("⏹️ Stopping Modbus reading...");
+
+            // Unsubscribe from event
+            ModbusService.WeightUpdated -= OnWeightUpdated;
+
+            // Cancel the reading loop
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+
+            // ✅ CRITICAL: Disconnect from PLC completely
+            ModbusService.Disconnect();
+
+            // Update state
+            isModbusReading = false;
+            isModbusConnected = false; // ✅ Mark as disconnected!
+
+            Console.WriteLine("✅ Modbus stopped and disconnected");
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error stopping Modbus: {ex.Message}");
+        }
     }
 
     private void OnWeightUpdated(decimal s1, decimal s2)

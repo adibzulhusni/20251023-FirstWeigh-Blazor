@@ -7,15 +7,11 @@ namespace FirstWeigh.Services
         private readonly IBatchService _batchService;
         private readonly RecipeService _recipeService;
         private WeighingSession? _activeSession;
-        private readonly ReportService _reportService; // ✅ ADD THIS LINE
-        private string? _currentRecordId; // ✅ ADD THIS LINE
 
-        public WeighingService(IBatchService batchService, RecipeService recipeService,
-            ReportService reportService) // ✅ ADD reportService parameter
+        public WeighingService(IBatchService batchService, RecipeService recipeService)
         {
             _batchService = batchService;
             _recipeService = recipeService;
-            _reportService = reportService; // ✅ ADD THIS LINE
         }
 
         public async Task<WeighingSession?> StartWeighingSessionAsync(string batchId)
@@ -36,8 +32,6 @@ namespace FirstWeigh.Services
             {
                 BatchId = batchId,
                 RecipeId = batch.RecipeId,
-                RecipeName = recipe.RecipeName,
-                RecipeCode = recipe.RecipeCode,
                 CurrentRepetition = batch.CurrentRepetition + 1,
                 TotalRepetitions = batch.TotalRepetitions,
                 CurrentIngredientIndex = 0,
@@ -45,19 +39,7 @@ namespace FirstWeigh.Services
                 OperatorName = batch.StartedBy ?? "Operator",
                 SessionStarted = DateTime.Now
             };
-            // ✅ ADD ONLY THESE LINES
-            try
-            {
-                _currentRecordId = await _reportService.StartWeighingRecordAsync(_activeSession);
-                Console.WriteLine($"📊 Started weighing record: {_currentRecordId}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Failed to start weighing record: {ex.Message}");
-            }
-            // ✅ END OF NEW CODE
 
-            _currentRecordId = await _reportService.StartWeighingRecordAsync(_activeSession);
             return _activeSession;
         }
 
@@ -157,9 +139,6 @@ namespace FirstWeigh.Services
             Console.WriteLine($"   Actual Scale 2: {actualScale2:F3} kg");
             Console.WriteLine($"   Difference: {difference:F3} kg");
 
-            // ✅ ADD THIS LINE
-            await SaveCurrentIngredientDetail(actualScale2);
-
             // Move to next ingredient
             _activeSession.CurrentIngredientIndex++;
 
@@ -180,13 +159,9 @@ namespace FirstWeigh.Services
                         batchId,
                         _activeSession.CurrentRepetition
                     );
-                    // ✅ ADD THIS LINE - Complete the report!
-                    await _reportService.CompleteWeighingRecordAsync(_currentRecordId, _activeSession.CurrentRepetition);
 
                     await _batchService.CompleteBatchAsync(batchId);
                     _activeSession = null;
-                    _currentRecordId = null; // ✅ ADD THIS LINE
-                    _currentRecordId = null; // ← ADD THIS TOO
                     return true;
                 }
 
@@ -248,10 +223,7 @@ namespace FirstWeigh.Services
                 return false;
 
             await _batchService.AbortBatchAsync(batchId, abortedBy, reason);
-            // ✅ ADD THIS LINE
-            await FinalizeCurrentReport(true, reason, abortedBy);
             _activeSession = null;
-            _currentRecordId = null; // ✅ ADD THIS LINE
 
             return true;
         }
@@ -267,7 +239,7 @@ namespace FirstWeigh.Services
         }
 
         public (string statusColor, string statusIcon, string statusMessage, bool canComplete)
-        GetIngredientStatus(decimal currentWeight, RecipeIngredient ingredient)
+            GetIngredientStatus(decimal currentWeight, RecipeIngredient ingredient)
         {
             var targetWeight = ingredient.TargetWeight;
             var tolerance = ingredient.TolerancePercentage;
@@ -305,62 +277,6 @@ namespace FirstWeigh.Services
             }
 
             return ("yellow", "⚠️", "Continue adding", false);
-        }
-        // ✅ ADD THIS NEW METHOD
-        private async Task SaveCurrentIngredientDetail(decimal actualWeight)
-        {
-            if (_activeSession == null || _currentRecordId == null || _activeSession.CurrentIngredient == null)
-                return;
-
-            try
-            {
-                var ingredient = _activeSession.CurrentIngredient;
-
-                var detail = new WeighingDetail
-                {
-                    RecordId = _currentRecordId,
-                    BatchId = _activeSession.BatchId,
-                    RepetitionNumber = _activeSession.CurrentRepetition,
-                    IngredientSequence = ingredient.Sequence,
-                    IngredientId = ingredient.IngredientId,
-                    IngredientCode = ingredient.IngredientCode,
-                    IngredientName = ingredient.IngredientName,
-                    TargetWeight = ingredient.TargetWeight,
-                    ActualWeight = _activeSession.NetIngredientWeight,
-                    MinWeight = ingredient.MinWeight,
-                    MaxWeight = ingredient.MaxWeight,
-                    ToleranceValue = ingredient.TolerancePercentage,
-                    BowlCode = _activeSession.SelectedIngredientBowlCode ?? "UNKNOWN",
-                    BowlType = ingredient.BowlSize,
-                    ScaleNumber = ingredient.ScaleNumber,
-                    Unit = ingredient.Unit,
-                    Timestamp = DateTime.Now
-                };
-
-                await _reportService.SaveIngredientDetailAsync(_currentRecordId, detail);
-                Console.WriteLine($"📊 Saved detail: {detail.IngredientCode} - {detail.ActualWeight:F3} kg");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Failed to save ingredient detail: {ex.Message}");
-            }
-        }
-
-        // ✅ ADD THIS NEW METHOD
-        private async Task FinalizeCurrentReport(bool isAborted, string? abortReason = null, string? abortedBy = null)
-        {
-            if (_currentRecordId == null)
-                return;
-
-            try
-            {
-                await _reportService.FinalizeReportAsync(_currentRecordId, isAborted, abortReason, abortedBy);
-                Console.WriteLine($"📊 Finalized report: {_currentRecordId}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Failed to finalize report: {ex.Message}");
-            }
         }
     }
 }
