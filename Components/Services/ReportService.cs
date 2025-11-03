@@ -95,6 +95,8 @@ namespace FirstWeigh.Services
             worksheet.Cell(1, 19).Value = "MaxDeviation";
             worksheet.Cell(1, 20).Value = "CreatedDate";
             worksheet.Cell(1, 21).Value = "CreatedBy";
+            worksheet.Cell(1, 22).Value = "PlannedStartTime";//added as of 20251029
+            worksheet.Cell(1, 23).Value = "PlannedEndTime";//added as of 20251029
 
             // Style headers
             var headerRange = worksheet.Range(1, 1, 1, 21);
@@ -180,6 +182,8 @@ namespace FirstWeigh.Services
                     RecipeName = session.RecipeName,  // ← Fixed from before!
                     OperatorName = session.OperatorName,
                     SessionStartTime = session.SessionStarted ?? DateTime.Now,
+                    PlannedStartTime = session.PlannedStartTime,  // ADDED AS OF 20251029
+                    PlannedEndTime = session.PlannedEndTime,      // ADDED AS OF 20251029
                     TotalRepetitions = session.TotalRepetitions,
                     CompletedRepetitions = 0,
                     Status = WeighingRecordStatus.InProgress,
@@ -215,12 +219,69 @@ namespace FirstWeigh.Services
                     worksheet.Cell(newRow, 19).Value = record.MaxDeviation;
                     worksheet.Cell(newRow, 20).Value = record.CreatedDate;
                     worksheet.Cell(newRow, 21).Value = record.CreatedBy;
+                    worksheet.Cell(newRow, 22).Value = record.PlannedStartTime;  // ADDED AS OF 20251029
+                    worksheet.Cell(newRow, 23).Value = record.PlannedEndTime;    // ADDED AS OF 20251029
+
 
                     workbook.Save();
                 }
 
                 Console.WriteLine($"✅ Started weighing record: {recordId}");
                 return recordId;
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+        public async Task FinalizeReportWithMetricsAsync(string recordId)
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                // Get all details for this record
+                var details = await GetDetailsByRecordIdAsync(recordId);
+
+                if (!details.Any())
+                {
+                    Console.WriteLine("⚠️ No details found for quality metrics calculation");
+                    return;
+                }
+
+                // Calculate metrics
+                int totalIngredients = details.Count;
+                int withinTolerance = details.Count(d => d.IsWithinTolerance);
+                int outOfTolerance = details.Count(d => !d.IsWithinTolerance);
+                decimal compliancePercentage = totalIngredients > 0
+                    ? (decimal)withinTolerance / totalIngredients * 100
+                    : 0;
+                decimal avgDeviation = details.Average(d => Math.Abs(d.Deviation));
+                decimal maxDeviation = details.Max(d => Math.Abs(d.Deviation));
+
+                // Update the record
+                using (var workbook = new XLWorkbook(_recordsFilePath))
+                {
+                    var worksheet = workbook.Worksheet("WeighingRecords");
+                    var rows = worksheet.RowsUsed().Skip(1);
+
+                    foreach (var row in rows)
+                    {
+                        if (row.Cell(1).GetString() == recordId)
+                        {
+                            row.Cell(15).Value = totalIngredients;
+                            row.Cell(16).Value = withinTolerance;
+                            row.Cell(17).Value = outOfTolerance;
+                            row.Cell(18).Value = avgDeviation;
+                            row.Cell(19).Value = maxDeviation;
+                            break;
+                        }
+                    }
+
+                    workbook.Save();
+                }
+
+                Console.WriteLine($"✅ Finalized report {recordId} with quality metrics:");
+                Console.WriteLine($"   Total: {totalIngredients}, Within: {withinTolerance}, Compliance: {compliancePercentage:F1}%");
             }
             finally
             {
@@ -260,7 +321,177 @@ namespace FirstWeigh.Services
                 return records;
             });
         }
+        public async Task<byte[]> ExportReportToExcelAsync(string recordId)
+        {
+            var record = await GetRecordByIdAsync(recordId);
+            if (record == null)
+                throw new Exception("Report not found");
 
+            var details = await GetDetailsByRecordIdAsync(recordId);
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Weighing Report");
+
+            // Title
+            worksheet.Cell(1, 1).Value = "FirstWeigh - Batch Weighing Report";
+            worksheet.Cell(1, 1).Style.Font.FontSize = 16;
+            worksheet.Cell(1, 1).Style.Font.Bold = true;
+            worksheet.Range(1, 1, 1, 10).Merge();
+
+            // Record ID
+            worksheet.Cell(2, 1).Value = $"Record ID: {record.RecordId}";
+            worksheet.Cell(2, 1).Style.Font.Bold = true;
+            worksheet.Range(2, 1, 2, 10).Merge();
+
+            // Batch Information Section
+            int row = 4;
+            worksheet.Cell(row, 1).Value = "BATCH INFORMATION";
+            worksheet.Cell(row, 1).Style.Font.Bold = true;
+            worksheet.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.LightBlue;
+            worksheet.Range(row, 1, row, 2).Merge();
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Batch ID:";
+            worksheet.Cell(row, 2).Value = record.BatchId;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Recipe:";
+            worksheet.Cell(row, 2).Value = record.RecipeName;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Recipe Code:";
+            worksheet.Cell(row, 2).Value = record.RecipeCode;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Operator:";
+            worksheet.Cell(row, 2).Value = record.OperatorName;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Status:";
+            worksheet.Cell(row, 2).Value = record.Status;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Repetitions:";
+            worksheet.Cell(row, 2).Value = $"{record.CompletedRepetitions} of {record.TotalRepetitions}";
+            row += 2;
+
+            // Timing Information
+            worksheet.Cell(row, 1).Value = "TIMING INFORMATION";
+            worksheet.Cell(row, 1).Style.Font.Bold = true;
+            worksheet.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.LightBlue;
+            worksheet.Range(row, 1, row, 2).Merge();
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Planned Start:";
+            worksheet.Cell(row, 2).Value = record.PlannedStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A";
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Planned End:";
+            worksheet.Cell(row, 2).Value = record.PlannedEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A";
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Actual Start:";
+            worksheet.Cell(row, 2).Value = record.SessionStartTime.ToString("yyyy-MM-dd HH:mm:ss");
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Actual End:";
+            worksheet.Cell(row, 2).Value = record.SessionEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A";
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Duration:";
+            worksheet.Cell(row, 2).Value = FormatDuration(record.Duration);
+            row += 2;
+
+            // Quality Metrics
+            worksheet.Cell(row, 1).Value = "QUALITY METRICS";
+            worksheet.Cell(row, 1).Style.Font.Bold = true;
+            worksheet.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.LightGreen;
+            worksheet.Range(row, 1, row, 2).Merge();
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Total Ingredients:";
+            worksheet.Cell(row, 2).Value = record.TotalIngredientsWeighed;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Within Tolerance:";
+            worksheet.Cell(row, 2).Value = record.IngredientsWithinTolerance;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Out of Tolerance:";
+            worksheet.Cell(row, 2).Value = record.IngredientsOutOfTolerance;
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Compliance Rate:";
+            worksheet.Cell(row, 2).Value = $"{record.CompliancePercentage:F1}%";
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Avg Deviation:";
+            worksheet.Cell(row, 2).Value = $"±{record.AverageDeviation:F3} kg";
+            row++;
+
+            worksheet.Cell(row, 1).Value = "Max Deviation:";
+            worksheet.Cell(row, 2).Value = $"±{record.MaxDeviation:F3} kg";
+            row += 2;
+
+            // Weighing Details Table
+            worksheet.Cell(row, 1).Value = "WEIGHING DETAILS";
+            worksheet.Cell(row, 1).Style.Font.Bold = true;
+            worksheet.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.Orange;
+            worksheet.Range(row, 1, row, 12).Merge();
+            row++;
+
+            // Headers
+            var headers = new[] { "Rep", "Seq", "Ing Code", "Ingredient", "Target (kg)", "Actual (kg)", "Deviation (kg)", "Min (kg)", "Max (kg)", "Status", "Bowl", "Time" };
+            for (int col = 0; col < headers.Length; col++)
+            {
+                worksheet.Cell(row, col + 1).Value = headers[col];
+                worksheet.Cell(row, col + 1).Style.Font.Bold = true;
+                worksheet.Cell(row, col + 1).Style.Fill.BackgroundColor = XLColor.LightGray;
+            }
+            row++;
+
+            // Data rows
+            foreach (var detail in details.OrderBy(d => d.RepetitionNumber).ThenBy(d => d.IngredientSequence))
+            {
+                worksheet.Cell(row, 1).Value = detail.RepetitionNumber;
+                worksheet.Cell(row, 2).Value = detail.IngredientSequence;
+                worksheet.Cell(row, 3).Value = detail.IngredientCode;
+                worksheet.Cell(row, 4).Value = detail.IngredientName;
+                worksheet.Cell(row, 5).Value = detail.TargetWeight;
+                worksheet.Cell(row, 6).Value = detail.ActualWeight;
+                worksheet.Cell(row, 7).Value = detail.Deviation;
+                worksheet.Cell(row, 8).Value = detail.MinWeight;
+                worksheet.Cell(row, 9).Value = detail.MaxWeight;
+                worksheet.Cell(row, 10).Value = detail.IsWithinTolerance ? "OK" : "OUT";
+                worksheet.Cell(row, 11).Value = detail.BowlCode;
+                worksheet.Cell(row, 12).Value = detail.Timestamp.ToString("HH:mm:ss");
+
+                // Color code the status
+                if (detail.IsWithinTolerance)
+                    worksheet.Cell(row, 10).Style.Fill.BackgroundColor = XLColor.LightGreen;
+                else
+                    worksheet.Cell(row, 10).Style.Fill.BackgroundColor = XLColor.LightPink;
+
+                row++;
+            }
+
+            // Auto-fit columns
+            worksheet.Columns().AdjustToContents();
+
+            // Convert to byte array
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }
+
+        private string FormatDuration(TimeSpan duration)
+        {
+            if (duration.TotalHours >= 1)
+                return $"{duration.Hours}h {duration.Minutes}m {duration.Seconds}s";
+            if (duration.TotalMinutes >= 1)
+                return $"{duration.Minutes}m {duration.Seconds}s";
+            return $"{duration.Seconds}s";
+        }
         // ✅ SAVE INGREDIENT DETAIL (called after each ingredient)
         public async Task SaveIngredientDetailAsync(string recordId, WeighingDetail detail)
         {
@@ -388,6 +619,54 @@ namespace FirstWeigh.Services
             worksheet.Cell(newRow, 21).Value = record.CreatedBy;
 
             workbook.Save();
+        }
+        public async Task DeleteRecordAsync(string recordId)
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                // Delete details
+                using (var workbook = new XLWorkbook(_detailsFilePath))
+                {
+                    var worksheet = workbook.Worksheet("WeighingDetails");
+                    var rowsToDelete = worksheet.RowsUsed().Skip(1)
+                        .Where(r => r.Cell(2).GetString() == recordId)
+                        .Select(r => r.RowNumber())
+                        .OrderByDescending(n => n)
+                        .ToList();
+
+                    foreach (var rowNumber in rowsToDelete)
+                        worksheet.Row(rowNumber).Delete();
+
+                    workbook.Save();
+                }
+
+                // Delete record
+                string batchId = "";
+                using (var workbook = new XLWorkbook(_recordsFilePath))
+                {
+                    var worksheet = workbook.Worksheet("WeighingRecords");
+                    foreach (var row in worksheet.RowsUsed().Skip(1))
+                    {
+                        if (row.Cell(1).GetString() == recordId)
+                        {
+                            batchId = row.Cell(2).GetString();
+                            row.Delete();
+                            break;
+                        }
+                    }
+                    workbook.Save();
+                }
+
+                // Delete JSON backup
+                var jsonFile = Path.Combine(_jsonBackupFolder, $"{recordId}_{batchId}.json");
+                if (File.Exists(jsonFile))
+                    File.Delete(jsonFile);
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
         }
 
         private async Task UpdateRecordAsync(WeighingRecord record)
@@ -582,7 +861,9 @@ namespace FirstWeigh.Services
                 AverageDeviation = row.Cell(18).GetValue<decimal>(),
                 MaxDeviation = row.Cell(19).GetValue<decimal>(),
                 CreatedDate = row.Cell(20).GetDateTime(),
-                CreatedBy = row.Cell(21).GetString()
+                CreatedBy = row.Cell(21).GetString(),
+                PlannedStartTime = row.Cell(22).IsEmpty() ? null : row.Cell(22).GetDateTime(),  // ADDED AS OF 20251029
+                PlannedEndTime = row.Cell(23).IsEmpty() ? null : row.Cell(23).GetDateTime()      // ADDED AS OF 20251029
             };
         }
 
@@ -625,16 +906,18 @@ namespace FirstWeigh.Services
                     {
                         if (row.Cell(1).GetString() == recordId)
                         {
-                            // Update to Completed
                             row.Cell(8).Value = DateTime.Now; // SessionEndTime
-                            row.Cell(10).Value = completedRepetitions; // ← ADD THIS! CompletedRepetitions
-                            row.Cell(11).Value = WeighingRecordStatus.Completed; // Status = "Completed"
+                            row.Cell(10).Value = completedRepetitions; // CompletedRepetitions
+                            row.Cell(11).Value = WeighingRecordStatus.Completed; // Status
                             break;
                         }
                     }
 
                     workbook.Save();
                 }
+
+                // Calculate and update quality metrics
+                await FinalizeReportWithMetricsAsync(recordId);
 
                 Console.WriteLine($"✅ Completed weighing record: {recordId}");
             }

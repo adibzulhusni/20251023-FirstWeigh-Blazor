@@ -5,6 +5,7 @@
 @using FirstWeigh.Services
 @inject ReportService ReportService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Reports - FirstWeigh</PageTitle>
 
@@ -244,6 +245,28 @@
         background-color: #3a8ee6;
     }
 
+    .btn-delete-report {
+        background-color: #e53e3e;
+        color: white;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-delete-report:hover {
+            background-color: #c53030;
+        }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
     .empty-state {
         text-align: center;
         padding: 60px 20px;
@@ -403,6 +426,9 @@
                                         <button class="btn-view-report" @onclick="() => ViewReport(report.RecordId)">
                                             View Report
                                         </button>
+                                        <button class="btn-delete-report" @onclick="() => DeleteReport(report.RecordId, report.BatchId)">
+                                            🗑️ Delete
+                                        </button>
                                     </td>
                                 </tr>
                             }
@@ -484,6 +510,25 @@
     private void ViewReport(string recordId)
     {
         Navigation.NavigateTo($"/report/{recordId}");
+    }
+    private async Task DeleteReport(string recordId, string batchId)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Delete report {recordId} for batch {batchId}?\n\nThis cannot be undone!");
+
+        if (confirmed)
+        {
+            try
+            {
+                await ReportService.DeleteRecordAsync(recordId);
+                await LoadReports();
+                await JSRuntime.InvokeVoidAsync("alert", $"✅ Report {recordId} deleted.");
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"❌ Error: {ex.Message}");
+            }
+        }
     }
 
     private string GetStatusClass(string status)

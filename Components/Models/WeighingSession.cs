@@ -9,6 +9,8 @@
         public string OperatorName { get; set; } = string.Empty;
         public DateTime StartTime { get; set; }
         public DateTime? SessionStarted { get; set; } // ✅ ADD THIS
+        public DateTime? PlannedStartTime { get; set; }    // ADD THIS LINE
+        public DateTime? PlannedEndTime { get; set; }      // ADD THIS LINE
         public int CurrentRepetition { get; set; } = 1;
         public int TotalRepetitions { get; set; }
         public int CurrentIngredientIndex { get; set; } = 0;

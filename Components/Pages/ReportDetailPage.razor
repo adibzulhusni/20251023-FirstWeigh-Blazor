@@ -399,6 +399,14 @@
                     <div class="info-value">@report.OperatorName</div>
                 </div>
                 <div class="info-box">
+                    <div class="info-label">Planned Start</div>
+                    <div class="info-value">@(report.PlannedStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A")</div>
+                </div>
+                <div class="info-box">
+                    <div class="info-label">Planned End</div>
+                    <div class="info-value">@(report.PlannedEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A")</div>
+                </div>
+                <div class="info-box">
                     <div class="info-label">Start Time</div>
                     <div class="info-value">@report.SessionStartTime.ToString("yyyy-MM-dd HH:mm:ss")</div>
                 </div>
@@ -592,8 +600,17 @@
 
     private async Task ExportToExcel()
     {
-        // TODO: Implement Excel export functionality
-        await JSRuntime.InvokeVoidAsync("alert", "Excel export coming soon!");
+        try
+        {
+            var excelBytes = await ReportService.ExportReportToExcelAsync(RecordId);
+            var fileName = $"Report_{RecordId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(excelBytes));
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error exporting to Excel: {ex.Message}");
+        }
     }
 
     private string GetStatusClass(string status)
