@@ -35,6 +35,77 @@
         margin-bottom: 16px;
     }
 
+    /* Date Filter Section */
+    .date-filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        margin-bottom: 24px;
+        display: flex;
+        gap: 16px;
+        align-items: end;
+    }
+
+    .filter-group {
+        flex: 1;
+    }
+
+    .filter-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+    }
+
+    .filter-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+    .btn-filter {
+        padding: 10px 20px;
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+        .btn-filter:hover {
+            background-color: #3a8ee6;
+        }
+
+    .btn-clear {
+        padding: 10px 20px;
+        background-color: #e2e8f0;
+        color: #4a5568;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-clear:hover {
+            background-color: #cbd5e0;
+        }
+
     /* Active Batches Section */
     .active-batches-section {
         margin-bottom: 40px;
@@ -375,6 +446,11 @@
         }
     }
 
+    .no-data-cell {
+        color: #a0aec0;
+        font-style: italic;
+    }
+
     @@media (max-width: 1024px) {
         .page-container {
             padding: 20px;
@@ -382,6 +458,10 @@
 
         .batch-card {
             min-width: 280px;
+        }
+
+        .date-filter-section {
+            flex-direction: column;
         }
     }
 
@@ -395,7 +475,7 @@
         }
 
         table {
-            min-width: 800px;
+            min-width: 1000px;
         }
     }
 </style>
@@ -419,24 +499,49 @@
     }
     else
     {
+        <!-- Date Filter Section -->
+        <div class="date-filter-section">
+            <div class="filter-group">
+                <label class="filter-label">Start Date (Planned) - From</label>
+                <input type="date" class="filter-input" @bind="filterStartDate" />
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">End Date (Planned) - To</label>
+                <input type="date" class="filter-input" @bind="filterEndDate" />
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-filter" @onclick="ApplyDateFilter">Apply Filter</button>
+                <button class="btn-clear" @onclick="ClearDateFilter">Clear</button>
+            </div>
+        </div>
+
         <!-- Active Batches Section -->
         <div class="active-batches-section">
-            <h2 class="section-title">Active Batches (@activeBatches.Count / 5)</h2>
+            <h2 class="section-title">Active Batches (@filteredActiveBatches.Count / 5)</h2>
 
-            @if (!activeBatches.Any())
+            @if (!filteredActiveBatches.Any())
             {
                 <div class="table-card">
                     <div class="empty-state">
                         <div class="empty-state-icon">🏭</div>
                         <div class="empty-state-text">No active batches</div>
-                        <div class="empty-state-subtext">Start a pending batch to begin production</div>
+                        <div class="empty-state-subtext">
+                            @if (isDateFiltered)
+                            {
+                                <text>No batches found in the selected date range</text>
+                            }
+                            else
+                            {
+                                <text>Start a pending batch to begin production</text>
+                            }
+                        </div>
                     </div>
                 </div>
             }
             else
             {
                 <div class="batch-cards-container">
-                    @foreach (var batch in activeBatches)
+                    @foreach (var batch in filteredActiveBatches)
                     {
                         <div class="batch-card @GetStatusClass(batch.Status)" @onclick="() => NavigateToBatch(batch.BatchId)">
                             <div class="batch-card-header">
@@ -460,11 +565,19 @@
                                     </div>
                                 }
 
-                                @if (batch.StartedDate.HasValue)
+                                @if (batch.PlannedStartTime.HasValue)
                                 {
                                     <div class="info-row">
-                                        <span class="info-label">Started:</span>
-                                        <span class="info-value" style="font-size: 11px;">@batch.StartedDate.Value.ToString("HH:mm")</span>
+                                        <span class="info-label">Planned Start:</span>
+                                        <span class="info-value" style="font-size: 11px;">@batch.PlannedStartTime.Value.ToString("MMM dd, HH:mm")</span>
+                                    </div>
+                                }
+
+                                @if (batch.PlannedEndTime.HasValue)
+                                {
+                                    <div class="info-row">
+                                        <span class="info-label">Planned End:</span>
+                                        <span class="info-value" style="font-size: 11px;">@batch.PlannedEndTime.Value.ToString("MMM dd, HH:mm")</span>
                                     </div>
                                 }
                             </div>
@@ -493,15 +606,17 @@
                             <th>Recipe</th>
                             <th>Status</th>
                             <th>Progress</th>
-                            <th>Operator</th>
-                            <th>Created Date</th>
+                            <th>Completed By</th>
+                            <th>Completed Date</th>
+                            <th>Aborted By</th>
+                            <th>Aborted Date</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (!allBatches.Any())
                         {
                             <tr>
-                                <td colspan="6">
+                                <td colspan="8">
                                     <div class="empty-state">
                                         <div class="empty-state-icon">📦</div>
                                         <div class="empty-state-text">No batches found</div>
@@ -527,8 +642,46 @@
                                             @batch.CurrentRepetition / @batch.TotalRepetitions (@batch.ProgressPercentage.ToString("F0")%)
                                         </span>
                                     </td>
-                                    <td>@(string.IsNullOrEmpty(batch.StartedBy) ? "-" : batch.StartedBy)</td>
-                                    <td>@batch.CreatedDate.ToString("MMM dd, yyyy HH:mm")</td>
+                                    <td>
+                                        @if (batch.Status == "Completed" && !string.IsNullOrEmpty(batch.StartedBy))
+                                        {
+                                            <span>@batch.StartedBy</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="no-data-cell">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (batch.CompletedDate.HasValue)
+                                        {
+                                            <span>@batch.CompletedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="no-data-cell">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(batch.AbortedBy))
+                                        {
+                                            <span>@batch.AbortedBy</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="no-data-cell">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (batch.AbortedDate.HasValue)
+                                        {
+                                            <span>@batch.AbortedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="no-data-cell">-</span>
+                                        }
+                                    </td>
                                 </tr>
                             }
                         }
@@ -541,9 +694,15 @@
 
 @code {
     private List<Batch> activeBatches = new();
+    private List<Batch> filteredActiveBatches = new();
     private List<Batch> allBatches = new();
     private bool isLoading = true;
     private System.Threading.Timer? refreshTimer;
+
+    // Date filter properties
+    private DateTime? filterStartDate;
+    private DateTime? filterEndDate;
+    private bool isDateFiltered = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -558,11 +717,88 @@
         // Load active batches (InProgress status)
         activeBatches = await BatchService.GetActiveBatchesAsync();
 
+        // Apply date filter if active
+        if (isDateFiltered)
+        {
+            ApplyDateFilter();
+        }
+        else
+        {
+            filteredActiveBatches = activeBatches.Take(5).ToList();
+        }
+
         // Load all batches, sorted by created date descending
         allBatches = await BatchService.GetAllBatchesAsync();
         allBatches = allBatches.OrderByDescending(b => b.CreatedDate).ToList();
 
         isLoading = false;
+    }
+
+    private void ApplyDateFilter()
+    {
+        if (!filterStartDate.HasValue && !filterEndDate.HasValue)
+        {
+            // No filter applied
+            filteredActiveBatches = activeBatches.Take(5).ToList();
+            isDateFiltered = false;
+            return;
+        }
+
+        isDateFiltered = true;
+        var filtered = activeBatches.AsEnumerable();
+
+        // Filter by planned start date range
+        if (filterStartDate.HasValue)
+        {
+            filtered = filtered.Where(b =>
+                b.PlannedStartTime.HasValue &&
+                b.PlannedStartTime.Value.Date >= filterStartDate.Value.Date);
+        }
+
+        // Filter by planned end date range
+        if (filterEndDate.HasValue)
+        {
+            filtered = filtered.Where(b =>
+                b.PlannedEndTime.HasValue &&
+                b.PlannedEndTime.Value.Date <= filterEndDate.Value.Date);
+        }
+
+        // Sort by priority:
+        // 1. Same planned start date (closest to filter start date)
+        // 2. Nearer planned end date (closer to today)
+        var today = DateTime.Now.Date;
+        var targetStartDate = filterStartDate?.Date ?? today;
+
+        filteredActiveBatches = filtered
+            .OrderBy(b =>
+            {
+                if (b.PlannedStartTime.HasValue)
+                {
+                    return Math.Abs((b.PlannedStartTime.Value.Date - targetStartDate).TotalDays);
+                }
+                return double.MaxValue;
+            })
+            .ThenBy(b =>
+            {
+                if (b.PlannedEndTime.HasValue)
+                {
+                    return Math.Abs((b.PlannedEndTime.Value.Date - today).TotalDays);
+                }
+                return double.MaxValue;
+            })
+            .Take(5) // Always show maximum 5 cards
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    private void ClearDateFilter()
+    {
+        filterStartDate = null;
+        filterEndDate = null;
+        isDateFiltered = false;
+        filteredActiveBatches = activeBatches.Take(5).ToList();
+        StateHasChanged();
     }
 
     private void StartAutoRefresh()
@@ -590,7 +826,7 @@
 
     private void NavigateToBatch(string batchId)
     {
-        // Navigate to batch management page with the batch selected
+        // Navigate to weighing page with the batch
         Navigation.NavigateTo($"/weighing/{batchId}");
     }
 

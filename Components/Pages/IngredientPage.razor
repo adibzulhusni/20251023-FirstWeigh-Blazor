@@ -5,7 +5,7 @@
 
 <PageTitle>Ingredient Management</PageTitle>
 
-<div class="ingredient-management-container">
+<div class="ingredient-management-container" style="padding-left: 20px;">
     <div class="page-header">
         <h3>Ingredient Management</h3>
         <div class="header-actions">
@@ -25,30 +25,16 @@
         </div>
     }
 
-    <div class="info-section">
-        <div class="info-card">
-            <div class="info-label">Excel File Location:</div>
-            <div class="info-value">
-                <code>@filePath</code>
-            </div>
-        </div>
-        <div class="info-card">
-            <div class="info-label">Last Loaded:</div>
-            <div class="info-value">@lastLoadedTime</div>
-        </div>
-        <div class="info-card">
-            <div class="info-label">Total Ingredients:</div>
-            <div class="info-value">@filteredIngredients.Count</div>
-        </div>
-    </div>
-
-    <div class="search-box">
+    <div class="search-box" style="display: flex; gap: 10px; align-items: center;">
         <input type="text"
                class="form-control"
                placeholder="Search by ID, Code, or Name..."
+               style="flex: 1;"
                @bind="searchQuery"
-               @bind:event="oninput"
-               @onkeyup="FilterIngredients" />
+               @bind:event="oninput" />
+        <button class="btn btn-primary" @onclick="FilterIngredients">
+            <span class="icon">🔍</span> Search
+        </button>
     </div>
 
     <div class="table-container">
@@ -58,8 +44,6 @@
                     <th>Ingredient ID</th>
                     <th>Code</th>
                     <th>Name</th>
-                    <th>Packing Type</th>
-                    <th>Unit</th>
                     <th>Created Date</th>
                     <th>Last Modified</th>
                     <th>Modified By</th>
@@ -74,12 +58,6 @@
                             <td><code>@ingredient.IngredientId</code></td>
                             <td><code>@ingredient.IngredientCode</code></td>
                             <td>@ingredient.IngredientName</td>
-                            <td>
-                                <span class="badge badge-info">@ingredient.PackingType</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-secondary">@ingredient.UnitOfMeasure</span>
-                            </td>
                             <td>@ingredient.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
                             <td>@ingredient.LastModifiedDate.ToString("yyyy-MM-dd HH:mm")</td>
                             <td>@ingredient.LastModifiedBy</td>
@@ -89,7 +67,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="8" class="text-center">
+                        <td colspan="6" class="text-center">
                             @if (string.IsNullOrWhiteSpace(searchQuery))
                             {
                                 <span>No ingredients found. Click "Open Excel" to add ingredients.</span>
@@ -111,8 +89,6 @@
     private List<Ingredient> filteredIngredients = new();
     private string searchQuery = string.Empty;
     private string successMessage = string.Empty;
-    private string filePath = string.Empty;
-    private string lastLoadedTime = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -123,12 +99,6 @@
     {
         ingredients = await IngredientService.GetAllIngredientsAsync();
         filteredIngredients = ingredients;
-        filePath = IngredientService.GetFilePath();
-
-        var lastLoaded = IngredientService.GetLastLoadedTime();
-        lastLoadedTime = lastLoaded != DateTime.MinValue
-            ? lastLoaded.ToString("yyyy-MM-dd HH:mm:ss")
-            : "Not loaded yet";
     }
 
     private void FilterIngredients()

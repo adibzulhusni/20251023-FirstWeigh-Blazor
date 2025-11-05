@@ -4,6 +4,7 @@
 @inject IBatchService BatchService
 @inject RecipeService RecipeService
 @inject IJSRuntime JSRuntime
+@inject AuthenticationService AuthService
 
 <style>
     .page-container {
@@ -546,7 +547,11 @@
                         <th>Recipe</th>
                         <th>Status</th>
                         <th>Repetitions</th>
-                        <th>Operator</th>
+                        <th>Start Date (Planned)</th>
+                        <th>End Date (Planned)</th>
+                        <th>Start Date (Actual)</th>
+                        <th>End Date (Actual)</th>
+                        <th>Created By</th>
                         <th>Created Date</th>
                         <th>Actions</th>
                     </tr>
@@ -555,7 +560,7 @@
                     @if (!filteredBatches.Any())
                     {
                         <tr>
-                            <td colspan="7">
+                            <td colspan="11">
                                 <div class="empty-state">
                                     <div class="empty-state-icon">📦</div>
                                     <div class="empty-state-text">No batches found</div>
@@ -583,6 +588,50 @@
                                 </td>
                                 <td>
                                     <span class="repetition-text">@batch.CurrentRepetition / @batch.TotalRepetitions</span>
+                                </td>
+                                <td>
+                                    @if (batch.PlannedStartTime.HasValue)
+                                    {
+                                        <span class="date-text">@batch.PlannedStartTime.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="no-operator">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (batch.PlannedEndTime.HasValue)
+                                    {
+                                        <span class="date-text">@batch.PlannedEndTime.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="no-operator">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (batch.StartedDate.HasValue)
+                                    {
+                                        <span class="date-text">@batch.StartedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="no-operator">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (batch.CompletedDate.HasValue)
+                                    {
+                                        <span class="date-text">@batch.CompletedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                    }
+                                    else if (batch.AbortedDate.HasValue)
+                                    {
+                                        <span class="date-text">@batch.AbortedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="no-operator">-</span>
+                                    }
                                 </td>
                                 <td>
                                     @if (string.IsNullOrEmpty(batch.StartedBy))
@@ -670,7 +719,7 @@
                 <div class="form-group">
                     <label class="form-label">Created By</label>
                     <input type="text" class="form-control" @bind="currentBatch.CreatedBy"
-                           placeholder="Operator name" disabled="@isEditMode" />
+                           placeholder="Operator name" disabled />
                 </div>
 
                 <div class="form-group">
@@ -883,6 +932,9 @@
     private string abortReason = "";
     private string supervisorName = "";
     private string abortedBy = "";
+    // Get current logged-in user
+    private string CurrentUsername => AuthService.CurrentUser?.Username ?? "Unknown";
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -935,7 +987,7 @@
         currentBatch = new Batch
         {
             TotalRepetitions = 1,
-            CreatedBy = "Operator" // Default, should be from logged-in user
+            CreatedBy = CurrentUsername // Auto-filled from logged-in user
         };
         isEditMode = false;
         showValidation = false;
@@ -989,7 +1041,7 @@
 
     private async Task StartBatch(string batchId)
     {
-        var success = await BatchService.StartBatchAsync(batchId, "Operator"); // Should use logged-in user
+        var success = await BatchService.StartBatchAsync(batchId, CurrentUsername); // Use current user
         if (success)
         {
             await LoadData();
@@ -1005,7 +1057,7 @@
         batchToAbort = batch;
         abortReason = "";
         supervisorName = "";
-        abortedBy = "Operator"; // Should use logged-in user
+        abortedBy = CurrentUsername; // Use current user
         showValidation = false;
         showAbortModal = true;
     }

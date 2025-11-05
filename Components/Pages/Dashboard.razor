@@ -1,4 +1,12 @@
 ﻿@page "/"
+@using FirstWeigh.Models
+@using FirstWeigh.Services
+@inject IBatchService BatchService
+@inject RecipeService RecipeService
+@inject IngredientService IngredientService
+@inject AuthenticationService AuthService
+@inject NavigationManager Navigation
+@implements IDisposable
 
 <style>
     .dashboard-container {
@@ -185,6 +193,7 @@
         justify-content: space-between;
         align-items: center;
         transition: all 0.2s;
+        cursor: pointer;
     }
 
         .batch-item:hover {
@@ -203,7 +212,64 @@
         font-weight: 600;
         color: #1a202c;
     }
+    /* Unauthorized Modal */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
 
+    .unauthorized-modal {
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        text-align: center;
+    }
+
+    .unauthorized-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+    }
+
+    .unauthorized-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 12px;
+    }
+
+    .unauthorized-message {
+        font-size: 14px;
+        color: #718096;
+        margin-bottom: 24px;
+        line-height: 1.5;
+    }
+
+    .btn-close-modal {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-close-modal:hover {
+            background-color: #3a8ee6;
+        }
     .batch-recipe {
         font-size: 13px;
         color: #718096;
@@ -242,6 +308,42 @@
         font-size: 14px;
     }
 
+    .loading-spinner {
+        text-align: center;
+        padding: 40px;
+        color: #718096;
+    }
+
+    .refresh-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #718096;
+        padding: 8px 16px;
+        background: #f7fafc;
+        border-radius: 6px;
+        margin-left: 16px;
+    }
+
+    .refresh-dot {
+        width: 8px;
+        height: 8px;
+        background: #48bb78;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.3;
+        }
+    }
+
     @@media (max-width: 1024px) {
         .dashboard-container {
             padding: 20px;
@@ -270,130 +372,307 @@
 <div class="dashboard-container">
     <!-- Dashboard Header -->
     <div class="dashboard-header">
-        <h1 class="dashboard-title">Dashboard</h1>
-        <p class="dashboard-subtitle">Welcome to FirstWeigh Blind Weighing System</p>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="stats-grid">
-        <div class="stat-card blue">
-            <div class="stat-header">
-                <div>
-                    <div class="stat-label">Active Batches</div>
-                </div>
-                <div class="stat-icon">📦</div>
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+                <h1 class="dashboard-title">Dashboard</h1>
+                <p class="dashboard-subtitle">Welcome back, <strong style="color: #4a9eff;">@CurrentUsername</strong> • @DateTime.Now.ToString("dddd, MMMM dd, yyyy")</p>
             </div>
-            <div class="stat-value">@activeBatchesCount</div>
-            <div class="stat-description">Currently in production</div>
-        </div>
-
-        <div class="stat-card green">
-            <div class="stat-header">
-                <div>
-                    <div class="stat-label">Completed Today</div>
-                </div>
-                <div class="stat-icon">✓</div>
-            </div>
-            <div class="stat-value">@completedTodayCount</div>
-            <div class="stat-description">Batches finished</div>
-        </div>
-
-        <div class="stat-card orange">
-            <div class="stat-header">
-                <div>
-                    <div class="stat-label">Total Ingredients</div>
-                </div>
-                <div class="stat-icon">🧪</div>
-            </div>
-            <div class="stat-value">@totalIngredientsCount</div>
-            <div class="stat-description">In system</div>
-        </div>
-
-        <div class="stat-card purple">
-            <div class="stat-header">
-                <div>
-                    <div class="stat-label">Available Bowls</div>
-                </div>
-                <div class="stat-icon">🥣</div>
-            </div>
-            <div class="stat-value">@availableBowlsCount</div>
-            <div class="stat-description">Ready for use</div>
+            <span class="refresh-indicator">
+                <span class="refresh-dot"></span>
+                Auto-refresh
+            </span>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="quick-actions-section">
-        <h2 class="section-title">Quick Actions</h2>
-        <div class="quick-actions-grid">
-            <a href="/batches" class="action-card">
-                <span class="action-icon">➕</span>
-                <span class="action-label">Create Batch</span>
-            </a>
-            <a href="/weighing" class="action-card">
-                <span class="action-icon">⚖️</span>
-                <span class="action-label">Start Weighing</span>
-            </a>
-            <a href="/ingredients" class="action-card">
-                <span class="action-icon">📋</span>
-                <span class="action-label">Manage Ingredients</span>
-            </a>
-            <a href="/recipes" class="action-card">
-                <span class="action-icon">📝</span>
-                <span class="action-label">View Recipes</span>
-            </a>
-            <a href="/bowls" class="action-card">
-                <span class="action-icon">🥣</span>
-                <span class="action-label">Bowl Status</span>
-            </a>
-            <a href="/production" class="action-card">
-                <span class="action-icon">🏭</span>
-                <span class="action-label">Production Overview</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Active Batches Preview -->
-    <div class="active-batches-preview">
-        <div class="section-header">
-            <h2 class="section-title">Active Batches</h2>
-            <a href="/production" class="view-all-link">View All →</a>
-        </div>
-
-        @if (!activeBatches.Any())
-        {
-            <div class="empty-state">
-                <div class="empty-icon">📦</div>
-                <div class="empty-text">No active batches at the moment</div>
-            </div>
-        }
-        else
-        {
-            <div class="batch-list">
-                @foreach (var batch in activeBatches)
-                {
-                    <div class="batch-item">
-                        <div class="batch-info">
-                            <span class="batch-code">@batch.BatchCode</span>
-                            <span class="batch-recipe">@batch.RecipeName</span>
-                        </div>
-                        <span class="batch-status @batch.Status.ToLower().Replace(" ", "-")">
-                            @batch.Status
-                        </span>
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Loading dashboard...</div>
+    }
+    else
+    {
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <div class="stat-card blue">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-label">Active Batches</div>
                     </div>
-                }
+                    <div class="stat-icon">📦</div>
+                </div>
+                <div class="stat-value">@activeBatchesCount</div>
+                <div class="stat-description">Currently in production</div>
             </div>
-        }
-    </div>
+
+            <div class="stat-card green">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-label">Completed Today</div>
+                    </div>
+                    <div class="stat-icon">✓</div>
+                </div>
+                <div class="stat-value">@completedTodayCount</div>
+                <div class="stat-description">Batches finished</div>
+            </div>
+
+            <div class="stat-card orange">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-label">Total Ingredients</div>
+                    </div>
+                    <div class="stat-icon">🧪</div>
+                </div>
+                <div class="stat-value">@totalIngredientsCount</div>
+                <div class="stat-description">In system</div>
+            </div>
+
+            <div class="stat-card purple">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-label">Available Bowls</div>
+                    </div>
+                    <div class="stat-icon">🥣</div>
+                </div>
+                <div class="stat-value">@availableBowlsCount</div>
+                <div class="stat-description">Ready for use</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions-section">
+            <h2 class="section-title">Quick Actions</h2>
+            <div class="quick-actions-grid">
+                <div class="action-card" @onclick="NavigateToCreateBatch">
+                    <span class="action-icon">➕</span>
+                    <span class="action-label">Create Batch</span>
+                </div>
+                <div class="action-card" @onclick="NavigateToWeighing">
+                    <span class="action-icon">⚖️</span>
+                    <span class="action-label">Start Weighing</span>
+                </div>
+                <div class="action-card" @onclick="NavigateToIngredients">
+                    <span class="action-icon">📋</span>
+                    <span class="action-label">Manage Ingredients</span>
+                </div>
+                <div class="action-card" @onclick="NavigateToRecipes">
+                    <span class="action-icon">📝</span>
+                    <span class="action-label">View Recipes</span>
+                </div>
+                <div class="action-card" @onclick="NavigateToBowls">
+                    <span class="action-icon">🥣</span>
+                    <span class="action-label">Bowl Status</span>
+                </div>
+                <div class="action-card" @onclick="NavigateToProduction">
+                    <span class="action-icon">🏭</span>
+                    <span class="action-label">Production Overview</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Batches Preview -->
+        <div class="active-batches-preview">
+            <div class="section-header">
+                <h2 class="section-title">Active Batches</h2>
+                <a href="/production" class="view-all-link">View All →</a>
+            </div>
+
+            @if (!activeBatches.Any())
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">📦</div>
+                    <div class="empty-text">No active batches at the moment</div>
+                </div>
+            }
+            else
+            {
+                <div class="batch-list">
+                    @foreach (var batch in activeBatches)
+                    {
+                        <div class="batch-item" @onclick="() => NavigateToBatch(batch.BatchCode)">
+                            <div class="batch-info">
+                                <span class="batch-code">@batch.BatchCode</span>
+                                <span class="batch-recipe">@batch.RecipeName</span>
+                            </div>
+                            <span class="batch-status in-progress">
+                                @batch.Status
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    <!-- Unauthorized Modal -->
+    @if (showUnauthorizedModal)
+    {
+        <div class="modal-overlay" @onclick="CloseUnauthorizedModal">
+            <div class="unauthorized-modal" @onclick:stopPropagation="true">
+                <div class="unauthorized-icon">🔒</div>
+                <h3 class="unauthorized-title">Access Denied</h3>
+                <p class="unauthorized-message">@unauthorizedMessage</p>
+                <button class="btn-close-modal" @onclick="CloseUnauthorizedModal">OK</button>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
-    // Placeholder data - will be replaced with real data from services
     private int activeBatchesCount = 0;
     private int completedTodayCount = 0;
     private int totalIngredientsCount = 0;
     private int availableBowlsCount = 0;
 
     private List<ActiveBatchInfo> activeBatches = new();
+    private System.Threading.Timer? refreshTimer;
+    private bool isLoading = true;
+
+    private string CurrentUsername => AuthService.CurrentUser?.Username ?? "User";
+    private UserPermissions UserPermissions => AuthService.GetCurrentUserPermissions();
+
+    // Modal for unauthorized access
+    private bool showUnauthorizedModal = false;
+    private string unauthorizedMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+        StartAutoRefresh();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        isLoading = true;
+
+        try
+        {
+            // Load batch statistics
+            var allBatches = await BatchService.GetAllBatchesAsync();
+            activeBatchesCount = allBatches.Count(b => b.Status == "InProgress");
+
+            var today = DateTime.Now.Date;
+            completedTodayCount = allBatches.Count(b =>
+                b.Status == "Completed" &&
+                b.CompletedDate.HasValue &&
+                b.CompletedDate.Value.Date == today);
+
+            // Load active batches for preview (top 5)
+            activeBatches = allBatches
+                .Where(b => b.Status == "InProgress")
+                .OrderByDescending(b => b.StartedDate)
+                .Take(5)
+                .Select(b => new ActiveBatchInfo
+                {
+                    BatchCode = b.BatchId,
+                    RecipeName = b.RecipeName,
+                    Status = "In Progress"
+                })
+                .ToList();
+
+            // Load ingredient statistics
+            var allIngredients = await IngredientService.GetAllIngredientsAsync();
+            totalIngredientsCount = allIngredients.Count;
+
+            // TODO: Load bowl statistics when bowl service is ready
+            availableBowlsCount = 0; // Placeholder
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+
+        isLoading = false;
+    }
+
+    private void StartAutoRefresh()
+    {
+        // Refresh every 10 seconds
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadDashboardData();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private void NavigateToBatch(string batchId)
+    {
+        Navigation.NavigateTo($"/production");
+    }
+
+    // Navigation with permission checks
+    private void NavigateToCreateBatch()
+    {
+        if (!UserPermissions.CanCreateBatches)
+        {
+            ShowUnauthorized("You don't have permission to create batches.");
+            return;
+        }
+        Navigation.NavigateTo("/batches");
+    }
+
+    private void NavigateToWeighing()
+    {
+        if (!UserPermissions.CanPerformWeighing)
+        {
+            ShowUnauthorized("You don't have permission to perform weighing operations.");
+            return;
+        }
+        Navigation.NavigateTo("/weighing");
+    }
+
+    private void NavigateToIngredients()
+    {
+        if (!UserPermissions.CanManageIngredients)
+        {
+            ShowUnauthorized("You don't have permission to manage ingredients.");
+            return;
+        }
+        Navigation.NavigateTo("/ingredients");
+    }
+
+    private void NavigateToRecipes()
+    {
+        if (!UserPermissions.CanViewRecipes)
+        {
+            ShowUnauthorized("You don't have permission to view recipes.");
+            return;
+        }
+        Navigation.NavigateTo("/recipes");
+    }
+
+    private void NavigateToBowls()
+    {
+        if (!UserPermissions.CanManageBowls)
+        {
+            ShowUnauthorized("You don't have permission to manage bowls.");
+            return;
+        }
+        Navigation.NavigateTo("/bowls");
+    }
+
+    private void NavigateToProduction()
+    {
+        Navigation.NavigateTo("/production");
+    }
+
+    private void ShowUnauthorized(string message)
+    {
+        unauthorizedMessage = message;
+        showUnauthorizedModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseUnauthorizedModal()
+    {
+        showUnauthorizedModal = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
 
     public class ActiveBatchInfo
     {

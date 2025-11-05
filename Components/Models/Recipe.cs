@@ -32,8 +32,14 @@
             // ✅ NEW: Bowl size for this ingredient
             public string BowlSize { get; set; } = "Medium"; // Small, Medium, Large
 
-            // Calculated properties
-            public decimal MinWeight => TargetWeight - ((TargetWeight * TolerancePercentage) / 100);
+            // NEW: Properties for searchable dropdown
+             public string SearchQuery { get; set; } = string.Empty;
+             public bool ShowDropdown { get; set; } = false;
+             public List<Ingredient> FilteredIngredients { get; set; } = new();
+
+
+        // Calculated properties
+        public decimal MinWeight => TargetWeight - ((TargetWeight * TolerancePercentage) / 100);
             public decimal MaxWeight => TargetWeight + ((TargetWeight * TolerancePercentage) / 100);
         }
 

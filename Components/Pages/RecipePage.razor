@@ -14,6 +14,13 @@
         margin: 0 auto;
     }
 
+    .ingredient-dropdown-item:hover {
+        background-color: #f7fafc;
+    }
+
+    .ingredient-dropdown-item:active {
+        background-color: #e6f7ff;
+    }
     .page-header {
         display: flex;
         justify-content: space-between;
@@ -744,13 +751,40 @@
                                     @ingredient.Sequence
                                 </div>
 
-                                <select style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" @bind="ingredient.IngredientId" @bind:after="() => UpdateIngredientDetails(ingredient)" disabled="@isViewMode">
-                                    <option value="">-- Select Ingredient --</option>
-                                    @foreach (var ing in availableIngredients)
+                                <div style="position: relative; flex: 1;">
+                                    @if (isViewMode)
                                     {
-                                        <option value="@ing.IngredientId">@ing.IngredientName (@ing.IngredientCode)</option>
+                                        <input type="text"
+                                               style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px; background-color: #f7fafc;"
+                                               value="@ingredient.IngredientName (@ingredient.IngredientCode)"
+                                               disabled />
                                     }
-                                </select>
+                                    else
+                                    {
+                                        <input type="text"
+                                               style="width: 100%; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;"
+                                               placeholder="Type to search ingredient..."
+                                               @bind="ingredient.SearchQuery"
+                                               @bind:event="oninput"
+                                               @onfocus="@(() => { ingredient.ShowDropdown = true; FilterIngredients(ingredient); })"
+                                               @onblur="@(() => HideDropdownDelayed(ingredient))" />
+
+                                        @if (ingredient.ShowDropdown && ingredient.FilteredIngredients.Any())
+                                        {
+                                            <div style="position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: white; border: 2px solid #4a9eff; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; margin-top: 2px;">
+                                                @foreach (var ing in ingredient.FilteredIngredients)
+                                                {
+                                                    <div style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background 0.2s;"
+                                                         @onmousedown="@(() => SelectIngredient(ingredient, ing))"
+                                                         class="ingredient-dropdown-item">
+                                                        <div style="font-weight: 600; color: #1a202c;">@ing.IngredientName</div>
+                                                        <div style="font-size: 11px; color: #718096; font-family: 'Roboto Mono', monospace;">@ing.IngredientCode</div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                </div>
 
                                 <input type="number" style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 13px;" placeholder="Weight (kg)" @bind="ingredient.TargetWeight" step="0.001" disabled="@isViewMode" />
 
@@ -1022,16 +1056,18 @@
             ? currentRecipe.Ingredients.Max(i => i.Sequence) + 1
             : 1;
 
-        currentRecipe.Ingredients.Add(new RecipeIngredient
+        var newIngredient = new RecipeIngredient
         {
             RecipeId = currentRecipe.RecipeId,
             Sequence = nextSequence,
             ScaleNumber = 1,
             Unit = "kg",
             TolerancePercentage = 2.0m,
-            BowlSize = "Medium" // ✅ NEW: Default bowl size
-        });
+            BowlSize = "Medium",
+            FilteredIngredients = availableIngredients.Take(10).ToList() // Initialize with first 10
+        };
 
+        currentRecipe.Ingredients.Add(newIngredient);
         StateHasChanged();
     }
 
@@ -1203,6 +1239,43 @@
     {
         await Task.Delay(5000);
         ClearMessages();
+        StateHasChanged();
+    }
+    private void FilterIngredients(RecipeIngredient recipeIngredient)
+    {
+        if (string.IsNullOrWhiteSpace(recipeIngredient.SearchQuery))
+        {
+            recipeIngredient.FilteredIngredients = availableIngredients.Take(10).ToList();
+        }
+        else
+        {
+            var query = recipeIngredient.SearchQuery.ToLower();
+            recipeIngredient.FilteredIngredients = availableIngredients
+                .Where(i =>
+                    i.IngredientName.ToLower().Contains(query) ||
+                    i.IngredientCode.ToLower().Contains(query) ||
+                    i.IngredientId.ToLower().Contains(query))
+                .Take(10)
+                .ToList();
+        }
+        recipeIngredient.ShowDropdown = true;
+    }
+
+    private void SelectIngredient(RecipeIngredient recipeIngredient, Ingredient ingredient)
+    {
+        recipeIngredient.IngredientId = ingredient.IngredientId;
+        recipeIngredient.IngredientCode = ingredient.IngredientCode;
+        recipeIngredient.IngredientName = ingredient.IngredientName;
+        recipeIngredient.SearchQuery = ingredient.IngredientName;
+        recipeIngredient.Unit = ingredient.UnitOfMeasure;
+        recipeIngredient.ShowDropdown = false;
+        StateHasChanged();
+    }
+
+    private async Task HideDropdownDelayed(RecipeIngredient recipeIngredient)
+    {
+        await Task.Delay(200); // Delay to allow click to register
+        recipeIngredient.ShowDropdown = false;
         StateHasChanged();
     }
 }

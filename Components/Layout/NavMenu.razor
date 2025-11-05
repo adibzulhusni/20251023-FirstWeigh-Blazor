@@ -62,8 +62,7 @@
 
             <!-- Ingredients - Admin, Developer, Supervisor only -->
             @if (AuthService.CurrentUser?.Role == UserRoles.Admin ||
-                    AuthService.CurrentUser?.Role == UserRoles.Developer ||
-                    AuthService.CurrentUser?.Role == UserRoles.Supervisor)
+                    AuthService.CurrentUser?.Role == UserRoles.Developer)
             {
                 <div class="nav-item">
                     <NavLink class="nav-link" href="ingredients" style="display: flex; align-items: center; padding: 0.75rem 1.25rem; color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; text-decoration: none;">

@@ -69,15 +69,15 @@
                 },
                 UserRoles.Supervisor => new UserPermissions
                 {
-                    CanViewRecipes = true,
-                    CanEditRecipes = true,
+                    CanViewRecipes = false,
+                    CanEditRecipes = false,
                     CanPerformWeighing = true,
                     CanApproveAborts = true,
                     CanManageUsers = false,
                     CanManageBowls = true,
                     CanViewBatchHistory = true,
                     CanCreateBatches = true,
-                    CanManageIngredients = true
+                    CanManageIngredients = false
                 },
                 UserRoles.Operator => new UserPermissions
                 {
@@ -86,7 +86,7 @@
                     CanPerformWeighing = true,
                     CanApproveAborts = false,
                     CanManageUsers = false,
-                    CanManageBowls = false,
+                    CanManageBowls = true,
                     CanViewBatchHistory = true,
                     CanCreateBatches = false,
                     CanManageIngredients = false
