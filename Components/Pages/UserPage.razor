@@ -1,179 +1,197 @@
 ﻿@page "/users"
 @using FirstWeigh.Models
+@using FirstWeigh.Components
 @using FirstWeigh.Services
 @inject UserService UserService
 @inject NavigationManager NavigationManager
+@inherits AuthorizedPageBase
 
 <PageTitle>User Management</PageTitle>
 
-<div class="user-management-container">
-    <div class="page-header">
-        <h3>User Management</h3>
-        <div class="header-actions">
-            <button class="btn btn-success" @onclick="OpenAddUserModal">
-                <span class="icon">➕</span> Add New User
-            </button>
-            <button class="btn btn-primary" @onclick="CreateBackup">
-                <span class="icon">💾</span> Create Backup
-            </button>
-        </div>
-    </div>
-
-    @if (!string.IsNullOrEmpty(successMessage))
-    {
-        <div class="alert alert-success">
-            @successMessage
-        </div>
-    }
-
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger">
-            @errorMessage
-        </div>
-    }
-
-    <div class="search-box">
-        <input type="text"
-               class="form-control"
-               placeholder="Search users..."
-               @bind="searchQuery"
-               @bind:event="oninput"
-               @onkeyup="FilterUsers" />
-    </div>
-
-    <div class="table-container">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>Username</th>
-                    <th>Full Name</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Created Date</th>
-                    <th>Last Login</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (filteredUsers.Any())
-                {
-                    @foreach (var user in filteredUsers)
-                    {
-                        <tr>
-                            <td><code>@user.UserId</code></td>
-                            <td>@user.Username</td>
-                            <td>@user.FullName</td>
-                            <td>
-                                <span class="badge badge-@GetRoleBadgeClass(user.Role)">
-                                    @user.Role
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-@(user.IsActive ? "success" : "secondary")">
-                                    @(user.IsActive ? "Active" : "Inactive")
-                                </span>
-                            </td>
-                            <td>@user.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td>@(user.LastLoginDate?.ToString("yyyy-MM-dd HH:mm") ?? "Never")</td>
-                            <td>
-                                <button class="btn btn-sm btn-warning" @onclick="() => OpenEditUserModal(user)">
-                                    ✏️ Edit
-                                </button>
-                                <button class="btn btn-sm btn-danger"
-                                        @onclick="() => DeleteUser(user.UserId)"
-                                        disabled="@(user.Role == UserRoles.Admin && users.Count(u => u.Role == UserRoles.Admin) <= 1)">
-                                    🗑️ Delete
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                }
-                else
-                {
-                    <tr>
-                        <td colspan="8" class="text-center">No users found</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
-
-@* Add/Edit User Modal *@
-@if (showModal)
+@if (!IsAuthorized)
 {
-    <div class="modal-overlay" @onclick="CloseModal">
-        <div class="modal-content" @onclick:stopPropagation="true">
-            <div class="modal-header">
-                <h4>@(isEditMode ? "Edit User" : "Add New User")</h4>
-                <button class="btn-close" @onclick="CloseModal">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Username *</label>
-                    <input type="text" class="form-control" @bind="currentUser.Username" />
-                </div>
-
-                <div class="form-group">
-                    <label>Password *</label>
-                    <input type="password" class="form-control" @bind="currentUser.Password" />
-                </div>
-
-                <div class="form-group">
-                    <label>Full Name *</label>
-                    <input type="text" class="form-control" @bind="currentUser.FullName" />
-                </div>
-
-                <div class="form-group">
-                    <label>Role *</label>
-                    <select class="form-control" @bind="currentUser.Role">
-                        @foreach (var role in UserRoles.GetAllRoles())
-                        {
-                            <option value="@role">@role</option>
-                        }
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" @bind="currentUser.IsActive" />
-                        Active
-                    </label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-                <button class="btn btn-primary" @onclick="SaveUser">
-                    @(isEditMode ? "Update" : "Create")
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+        <div style="text-align: center;">
+            <h1 style="font-size: 48px; color: #e53e3e; margin-bottom: 16px;">🚫</h1>
+            <h2 style="font-size: 24px; color: #1a202c; margin-bottom: 8px;">Access Denied</h2>
+            <p style="font-size: 16px; color: #718096; margin-bottom: 24px;">You are not authorized to access this page.</p>
+            <button style="padding: 12px 24px; background-color: #4a9eff; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer;"
+                    @onclick='() => NavigationManager.NavigateTo("/")'>
+                Go to Dashboard
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="user-management-container">
+        <div class="page-header">
+            <h3>User Management</h3>
+            <div class="header-actions">
+                <button class="btn btn-success" @onclick="OpenAddUserModal">
+                    <span class="icon">➕</span> Add New User
+                </button>
+                <button class="btn btn-primary" @onclick="CreateBackup">
+                    <span class="icon">💾</span> Create Backup
                 </button>
             </div>
         </div>
-    </div>
-}
 
-@* Delete Confirmation Modal *@
-@if (showDeleteConfirm)
-{
-    <div class="modal-overlay" @onclick="CancelDelete">
-        <div class="modal-content modal-sm" @onclick:stopPropagation="true">
-            <div class="modal-header">
-                <h4>Confirm Delete</h4>
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success">
+                @successMessage
             </div>
-            <div class="modal-body">
-                <p>Are you sure you want to delete this user?</p>
-                <p><strong>This action cannot be undone.</strong></p>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">
+                @errorMessage
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
-                <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
-            </div>
+        }
+
+        <div class="search-box">
+            <input type="text"
+                   class="form-control"
+                   placeholder="Search users..."
+                   @bind="searchQuery"
+                   @bind:event="oninput"
+                   @onkeyup="FilterUsers" />
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created Date</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredUsers.Any())
+                    {
+                        @foreach (var user in filteredUsers)
+                        {
+                            <tr>
+                                <td><code>@user.UserId</code></td>
+                                <td>@user.Username</td>
+                                <td>@user.FullName</td>
+                                <td>
+                                    @user.Role
+                                </td>
+                                <td>
+                                    @(user.IsActive ? "Active" : "Inactive")
+                                </td>
+                                <td>@user.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@(user.LastLoginDate?.ToString("yyyy-MM-dd HH:mm") ?? "Never")</td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" @onclick="() => OpenEditUserModal(user)">
+                                        ✏️ Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger"
+                                            @onclick="() => DeleteUser(user.UserId)"
+                                            disabled="@(user.Role == UserRoles.Admin && users.Count(u => u.Role == UserRoles.Admin) <= 1)">
+                                        🗑️ Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center">No users found</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
+
+    @* Add/Edit User Modal *@
+    @if (showModal)
+    {
+        <div class="modal-overlay" @onclick="CloseModal">
+            <div class="modal-content" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h4>@(isEditMode ? "Edit User" : "Add New User")</h4>
+                    <button class="btn-close" @onclick="CloseModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" class="form-control" @bind="currentUser.Username" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Password *</label>
+                        <input type="password" class="form-control" @bind="currentUser.Password" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" class="form-control" @bind="currentUser.FullName" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select class="form-control" @bind="currentUser.Role">
+                            @foreach (var role in UserRoles.GetAllRoles())
+                            {
+                                <option value="@role">@role</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" @bind="currentUser.IsActive" />
+                            Active
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveUser">
+                        @(isEditMode ? "Update" : "Create")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Delete Confirmation Modal *@
+    @if (showDeleteConfirm)
+    {
+        <div class="modal-overlay" @onclick="CancelDelete">
+            <div class="modal-content modal-sm" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h4>Confirm Delete</h4>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this user?</p>
+                    <p><strong>This action cannot be undone.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
+    // Specify which roles can access this page
+    protected override string[] AllowedRoles => new[] { UserRoles.Admin, UserRoles.Developer };
+
     private List<User> users = new();
     private List<User> filteredUsers = new();
     private string searchQuery = string.Empty;
@@ -187,18 +205,35 @@
     private bool showDeleteConfirm = false;
     private string userIdToDelete = string.Empty;
 
-    // TODO: Get from authentication
-    private string currentUsername = "admin";
+    private string currentUsername => CurrentUser?.Username ?? "admin";
 
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
         await LoadUsers();
     }
 
     private async Task LoadUsers()
     {
-        users = await UserService.GetAllUsersAsync();
-        filteredUsers = users;
+        try
+        {
+            Console.WriteLine("=== Loading Users ===");
+            users = await UserService.GetAllUsersAsync();
+            Console.WriteLine($"Total users loaded: {users.Count}");
+
+            foreach (var user in users)
+            {
+                Console.WriteLine($"User: {user.UserId} | Username: {user.Username} | Role: '{user.Role}' | FullName: {user.FullName}");
+            }
+
+            filteredUsers = users;
+            Console.WriteLine("=== Users Loaded Successfully ===");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR loading users: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
     }
 
     private void FilterUsers()
@@ -259,7 +294,6 @@
     {
         ClearMessages();
 
-        // Validation
         if (string.IsNullOrWhiteSpace(currentUser.Username) ||
             string.IsNullOrWhiteSpace(currentUser.Password) ||
             string.IsNullOrWhiteSpace(currentUser.FullName))
@@ -273,16 +307,15 @@
         if (isEditMode)
         {
             success = await UserService.UpdateUserAsync(currentUser, currentUsername);
-            successMessage = success ? "User updated successfully!" : "Failed to update user. Username may already exist.";
         }
         else
         {
             success = await UserService.AddUserAsync(currentUser, currentUsername);
-            successMessage = success ? "User created successfully!" : "Failed to create user. Username may already exist.";
         }
 
         if (success)
         {
+            successMessage = isEditMode ? "User updated successfully!" : "User created successfully!";
             await LoadUsers();
             CloseModal();
             ClearMessagesAfterDelay();
@@ -364,4 +397,4 @@
         ClearMessages();
         StateHasChanged();
     }
-}
+}}

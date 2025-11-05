@@ -252,7 +252,7 @@
         </div>
 
         <div class="error-message @(showError ? "show" : "")">
-            Invalid credentials. Please try again.
+            @errorMessage
         </div>
 
         <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
@@ -308,6 +308,7 @@
     private LoginModel loginModel = new LoginModel();
     private bool isLoggingIn = false;
     private bool showError = false;
+    private string errorMessage = string.Empty;  // <-- ADD THIS LINE
 
     private async Task HandleLogin()
     {
@@ -316,28 +317,33 @@
 
         showError = false;
         isLoggingIn = true;
+        StateHasChanged();  // Force UI update to show "Signing In..."
 
         try
         {
-            bool loginSuccess = await AuthService.LoginAsync(loginModel.Username, loginModel.Password, loginModel.RememberMe);
+            var success = await AuthService.LoginAsync(
+                loginModel.Username,
+                loginModel.Password,
+                loginModel.RememberMe
+            );
 
-            if (loginSuccess)
+            if (success)
             {
-                Navigation.NavigateTo("/");
+                // Force reload to ensure fresh state
+                Navigation.NavigateTo("/", forceLoad: true);
             }
             else
             {
                 showError = true;
+                isLoggingIn = false;
+                StateHasChanged();
             }
         }
         catch (Exception ex)
         {
             showError = true;
-            Console.WriteLine($"Login error: {ex.Message}");
-        }
-        finally
-        {
             isLoggingIn = false;
+            StateHasChanged();
         }
     }
 

@@ -1,6 +1,5 @@
 ﻿using FirstWeigh.Models;
 using System.Timers;
-using static FirstWeigh.Models.UserPermissions;
 
 namespace FirstWeigh.Services
 {
@@ -12,16 +11,22 @@ namespace FirstWeigh.Services
         private System.Timers.Timer? _sessionTimer;
         private const string SESSION_KEY = "FirstWeigh_Session";
         private const int SESSION_TIMEOUT_MINUTES = 5;
+        private readonly LoginAttemptService _loginAttemptService;
+        private readonly AuditLogService _auditLogService;
 
         public event Action<CurrentUserInfo?>? OnAuthenticationStateChanged;
 
         public CurrentUserInfo? CurrentUser => _currentUser;
         public bool IsAuthenticated => _currentUser != null;
 
-        public AuthenticationService(UserService userService, BrowserStorageService storageService)
+
+
+        public AuthenticationService(UserService userService, BrowserStorageService storageService,LoginAttemptService loginAttemptService, AuditLogService auditLogService)
         {
             _userService = userService;
             _storageService = storageService;
+            _loginAttemptService = loginAttemptService;
+            _auditLogService = auditLogService;
         }
 
         public async Task<bool> LoginAsync(string username, string password, bool rememberMe = false)
@@ -32,7 +37,6 @@ namespace FirstWeigh.Services
             {
                 _currentUser = new CurrentUserInfo(user.Username, user.Role);
 
-                // Save session to localStorage
                 var sessionData = new SessionData
                 {
                     Username = _currentUser.Username,
@@ -43,11 +47,7 @@ namespace FirstWeigh.Services
                 };
 
                 await _storageService.SetItemAsync(SESSION_KEY, sessionData);
-
-                // Start activity tracking
                 await _storageService.StartActivityTrackingAsync();
-
-                // Start session timeout timer
                 StartSessionTimer();
 
                 OnAuthenticationStateChanged?.Invoke(_currentUser);
@@ -56,9 +56,9 @@ namespace FirstWeigh.Services
 
             return false;
         }
-
         public async Task LogoutAsync()
         {
+            var username = _currentUser?.Username ?? "Unknown";
             _currentUser = null;
 
             // Stop timer

@@ -25,6 +25,10 @@ namespace _20251013_FirstWeigh_Blazor
             builder.Services.AddSingleton<ReportService>();
             // Add this line where you register services:
             builder.Services.AddScoped<AuthenticationService>();
+
+            // ADD THESE TWO NEW LINES:
+            builder.Services.AddScoped<LoginAttemptService>();
+            builder.Services.AddScoped<AuditLogService>();
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();

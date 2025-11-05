@@ -99,20 +99,37 @@
         /// <summary>
         /// Lightweight class to hold current authenticated user information
         /// </summary>
-        public class CurrentUserInfo
+       
+    }
+    public class CurrentUserInfo
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public DateTime LoginTime { get; set; } = DateTime.Now;
+
+        public CurrentUserInfo() { }
+
+        public CurrentUserInfo(string username, string role)
         {
-            public string Username { get; set; } = string.Empty;
-            public string Role { get; set; } = string.Empty;
-            public DateTime LoginTime { get; set; } = DateTime.Now;
-
-            public CurrentUserInfo() { }
-
-            public CurrentUserInfo(string username, string role)
-            {
-                Username = username;
-                Role = role;
-                LoginTime = DateTime.Now;
-            }
+            Username = username;
+            Role = role;
+            LoginTime = DateTime.Now;
         }
+    }
+    public class LoginAttempt
+    {
+        public string Username { get; set; } = string.Empty;
+        public string IpAddress { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    public class AuditLog
+    {
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public string Username { get; set; } = string.Empty;
+        public string Action { get; set; } = string.Empty;
+        public string Details { get; set; } = string.Empty;
+        public string IpAddress { get; set; } = string.Empty;
     }
 }
