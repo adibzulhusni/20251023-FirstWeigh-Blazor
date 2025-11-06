@@ -8,6 +8,7 @@
 @implements IDisposable
 @inject ModbusScaleService ModbusService
 @inject BowlService BowlService
+@inject AuthenticationService AuthService  // ✅ ADD THIS
 
 <style>
     /* Copy all your existing CSS styles here - they're fine */
@@ -503,7 +504,7 @@
                 </div>
                 <div class="info-item">
                     <span class="info-label">Operator</span>
-                    <span class="info-value">@session.OperatorName</span>
+                    <span class="info-value" style="color: #4a9eff;">@(string.IsNullOrEmpty(currentLoggedInUser) ? session.OperatorName : currentLoggedInUser)</span>
                 </div>
             </div>
             <div class="header-actions">
@@ -837,15 +838,46 @@
 @if (showAbortModal)
 {
     <div class="modal-overlay" @onclick="CloseAbortModal">
-        <div class="modal-content" @onclick:stopPropagation="true">
+        <div class="modal-content" @onclick:stopPropagation="true" style="max-width: 500px;">
             <div class="modal-header">
                 <h2 class="modal-title">⚠️ Abort Weighing Session</h2>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to abort this weighing session?</p>
-                <p style="margin-top: 12px; font-size: 14px; color: #718096;">
-                    Batch: <strong>@session?.BatchId</strong>
+                <p style="margin-bottom: 16px;">
+                    Are you sure you want to abort batch <strong>@session?.BatchId</strong>?
                 </p>
+
+                <!-- Abort Reason -->
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">
+                        Abort Reason *
+                    </label>
+                    <textarea class="form-control" @bind="abortReason" rows="4"
+                              placeholder="Please explain why this weighing session is being aborted..."
+                              style="width: 100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical;"></textarea>
+                    @if (showValidation && string.IsNullOrWhiteSpace(abortReason))
+                    {
+                        <span style="color: #e53e3e; font-size: 12px; display: block; margin-top: 6px;">
+                            Abort reason is required
+                        </span>
+                    }
+                </div>
+
+                <!-- Aborted By -->
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">
+                        Aborted By *
+                    </label>
+                    <input type="text" class="form-control" @bind="abortedBy"
+                           placeholder="Enter your name"
+                           style="width: 100%; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px;" />
+                    @if (showValidation && string.IsNullOrWhiteSpace(abortedBy))
+                    {
+                        <span style="color: #e53e3e; font-size: 12px; display: block; margin-top: 6px;">
+                            Name is required
+                        </span>
+                    }
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" @onclick="CloseAbortModal">Cancel</button>
@@ -854,7 +886,6 @@
         </div>
     </div>
 }
-
 <!-- Bowl Removal Modal - Only for last ingredient -->
 @if (showBowlRemovalModal)
 {
@@ -935,9 +966,24 @@
     private decimal selectedMixingBowlWeight = 0;
     private bool ingredientBowlVerified = false;
     private bool mixingBowlVerified = false;
+    private string currentLoggedInUser = "";
+    private bool showValidation = false;  // ✅ ADD THIS
+    private string abortReason = "";      // ✅ ADD THIS
+    private string abortedBy = "";        // ✅ ADD THIS
+
 
     protected override async Task OnInitializedAsync()
     {
+        // ✅ Get current logged-in user from AuthService property
+        if (AuthService.CurrentUser != null)
+        {
+            currentLoggedInUser = AuthService.CurrentUser.Username;
+        }
+        else
+        {
+            currentLoggedInUser = "Unknown";
+        }
+
         session = WeighingService.GetActiveSession();
 
         if (session == null && !string.IsNullOrEmpty(BatchId))
@@ -1069,6 +1115,12 @@
     {
         if (isModbusReading) return;
 
+        // ✅ Update operator to current logged-in user AND save to database
+        if (session != null && !string.IsNullOrEmpty(currentLoggedInUser))
+        {
+            await WeighingService.UpdateSessionOperatorAsync(session.BatchId, currentLoggedInUser);
+            Console.WriteLine($"✅ Operator updated to: {currentLoggedInUser}");
+        }
         try
         {
             if (!isModbusConnected)
@@ -1302,19 +1354,38 @@
 
     private void OpenAbortModal()
     {
+        abortReason = "";
+        abortedBy = currentLoggedInUser; // ✅ Pre-fill with current operator
+        showValidation = false;
         showAbortModal = true;
     }
 
     private void CloseAbortModal()
     {
         showAbortModal = false;
+        showValidation = false;
+        abortReason = "";
+        abortedBy = "";
     }
 
     private async Task ConfirmAbort()
     {
         if (session == null) return;
+
+        // ✅ VALIDATION
+        showValidation = true;
+
+        if (string.IsNullOrWhiteSpace(abortReason) || string.IsNullOrWhiteSpace(abortedBy))
+        {
+            StateHasChanged(); // Show validation errors
+            return;
+        }
+
+        // ✅ Stop Modbus and abort with reason
         StopModbusReading();
-        await WeighingService.AbortSessionAsync(session.BatchId, "Aborted from weighing interface", session.OperatorName);
+        await WeighingService.AbortSessionAsync(session.BatchId, abortReason, abortedBy);
+
+        // Navigate away
         Navigation.NavigateTo("/production");
     }
 

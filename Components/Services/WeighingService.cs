@@ -25,7 +25,29 @@ namespace FirstWeigh.Services
             _recipeService = recipeService;
             _reportService = reportService;
         }
+        public async Task<bool> UpdateSessionOperatorAsync(string batchId, string operatorName)
+        {
+            if (_activeSession == null || _activeSession.BatchId != batchId)
+                return false;
 
+            // Update session
+            _activeSession.OperatorName = operatorName;
+
+            // ✅ Update WeighingRecord in database
+            if (!string.IsNullOrEmpty(_activeSession.WeighingRecordId))
+            {
+                var record = await _reportService.GetWeighingRecordByIdAsync(_activeSession.WeighingRecordId);
+                if (record != null)
+                {
+                    record.OperatorName = operatorName;
+                    await _reportService.UpdateWeighingRecordAsync(record);
+                    Console.WriteLine($"✅ WeighingRecord operator updated to: {operatorName}");
+                    return true;
+                }
+            }
+
+            return false;
+        }
         public async Task<WeighingSession?> StartWeighingSessionAsync(string batchId)
         {
             var batch = await _batchService.GetBatchByIdAsync(batchId);
@@ -172,9 +194,7 @@ namespace FirstWeigh.Services
             return true;
         }
 
-        public async Task<(bool success, string message, decimal deviation)> ConfirmTransferAsync(
-            string batchId,
-            decimal currentScale2Weight)
+        public async Task<(bool success, string message, decimal deviation)> ConfirmTransferAsync(string batchId,decimal currentScale2Weight)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
                 return (false, "No active session", 0);
@@ -243,8 +263,9 @@ namespace FirstWeigh.Services
                 TransferredAt = DateTime.Now,
                 BowlCode = _activeSession.SelectedIngredientBowlCode ?? "",
                 BowlType = ingredient.BowlSize,
-                MinWeight = ingredient.MinWeight,
-                MaxWeight = ingredient.MaxWeight,
+                // ✅ CALCULATE tolerance range from target and tolerance value
+                MinWeight = ingredient.TargetWeight - toleranceValue,  // ✅ FIXED!
+                MaxWeight = ingredient.TargetWeight + toleranceValue,  // ✅ FIXED!
                 ToleranceValue = toleranceValue
             };
 
@@ -357,16 +378,56 @@ namespace FirstWeigh.Services
             if (_activeSession == null || _activeSession.BatchId != batchId)
                 return false;
 
-            // ✅ Update WeighingRecord
+            // ✅ Update WeighingRecord first
             await UpdateWeighingRecordOnCompletion();
 
-            // ✅ Complete batch in batch service
-            await _batchService.CompleteBatchAsync(batchId);
+            // ✅ DEFENSIVE: Get the most reliable operator name
+            string completedByOperator = _activeSession.OperatorName;
+
+            // If session operator is empty, try to get from WeighingRecord
+            if (string.IsNullOrEmpty(completedByOperator))
+            {
+                Console.WriteLine("⚠️ WARNING: Session operator is empty! Checking WeighingRecord...");
+
+                if (!string.IsNullOrEmpty(_activeSession.WeighingRecordId))
+                {
+                    var record = await _reportService.GetWeighingRecordByIdAsync(_activeSession.WeighingRecordId);
+                    if (record != null && !string.IsNullOrEmpty(record.OperatorName))
+                    {
+                        completedByOperator = record.OperatorName;
+                        Console.WriteLine($"✅ Using operator from WeighingRecord: {completedByOperator}");
+                    }
+                }
+            }
+
+            // If still empty, try to get from batch
+            if (string.IsNullOrEmpty(completedByOperator))
+            {
+                Console.WriteLine("⚠️ WARNING: Still no operator! Checking Batch.StartedBy...");
+                var batch = await _batchService.GetBatchByIdAsync(batchId);
+                if (batch != null && !string.IsNullOrEmpty(batch.StartedBy))
+                {
+                    completedByOperator = batch.StartedBy;
+                    Console.WriteLine($"✅ Using operator from Batch.StartedBy: {completedByOperator}");
+                }
+            }
+
+            // Final fallback
+            if (string.IsNullOrEmpty(completedByOperator))
+            {
+                completedByOperator = "Unknown Operator";
+                Console.WriteLine("❌ ERROR: No operator found anywhere! Using fallback.");
+            }
+
+            Console.WriteLine($"🎯 Completing batch {batchId} with operator: {completedByOperator}");
+
+            // ✅ Complete batch with the operator name
+            await _batchService.CompleteBatchAsync(batchId, completedByOperator);
 
             // Clear session
             _activeSession = null;
 
-            Console.WriteLine($"🎉 Batch {batchId} completed successfully!");
+            Console.WriteLine($"🎉 Batch {batchId} completed successfully by {completedByOperator}!");
             return true;
         }
 

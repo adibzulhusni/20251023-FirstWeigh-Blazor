@@ -643,9 +643,9 @@
                                         </span>
                                     </td>
                                     <td>
-                                        @if (batch.Status == "Completed" && !string.IsNullOrEmpty(batch.StartedBy))
+                                        @if (batch.Status == "Completed" && !string.IsNullOrEmpty(batch.CompletedBy))
                                         {
-                                            <span>@batch.StartedBy</span>
+                                            <span>@batch.CompletedBy</span>
                                         }
                                         else
                                         {

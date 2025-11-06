@@ -13,10 +13,10 @@ namespace FirstWeigh.Services
         Task<bool> UpdateBatchAsync(Batch batch);
         Task<bool> DeleteBatchAsync(string batchId);
         Task<bool> StartBatchAsync(string batchId, string startedBy);
-        Task<bool> CompleteBatchAsync(string batchId);
         Task<bool> AbortBatchAsync(string batchId, string abortedBy, string abortReason);
         Task<bool> UpdateRepetitionProgressAsync(string batchId, int currentRepetition);
         Task<int> GetActiveBatchCountAsync();
         Task<bool> CanStartBatch(); // Check if less than 5 active batches
+        Task<bool> CompleteBatchAsync(string batchId, string completedBy);  // ✅ CORRECT - Add second parameter
     }
 }

@@ -41,10 +41,11 @@ namespace FirstWeigh.Services
                 worksheet.Cell(1, 11).Value = "StartedBy";
                 worksheet.Cell(1, 12).Value = "StartedDate";
                 worksheet.Cell(1, 13).Value = "CompletedDate";
-                worksheet.Cell(1, 14).Value = "AbortReason";
-                worksheet.Cell(1, 15).Value = "AbortedBy";
-                worksheet.Cell(1, 16).Value = "AbortedDate";
-                worksheet.Cell(1, 17).Value = "Notes";
+                worksheet.Cell(1, 14).Value = "CompletedBy";      // ✅ ADD THIS
+                worksheet.Cell(1, 15).Value = "AbortReason";
+                worksheet.Cell(1, 16).Value = "AbortedBy";
+                worksheet.Cell(1, 17).Value = "AbortedDate";
+                worksheet.Cell(1, 18).Value = "Notes";
 
                 // Style headers
                 var headerRange = worksheet.Range(1, 1, 1, 17);
@@ -94,10 +95,11 @@ namespace FirstWeigh.Services
                                     StartedBy = row.Cell(11).IsEmpty() ? null : row.Cell(11).GetString(),
                                     StartedDate = ParseNullableDateTime(row.Cell(12)),
                                     CompletedDate = ParseNullableDateTime(row.Cell(13)),
-                                    AbortReason = row.Cell(14).IsEmpty() ? null : row.Cell(14).GetString(),
-                                    AbortedBy = row.Cell(15).IsEmpty() ? null : row.Cell(15).GetString(),
-                                    AbortedDate = ParseNullableDateTime(row.Cell(16)),
-                                    Notes = row.Cell(17).IsEmpty() ? null : row.Cell(17).GetString()
+                                    CompletedBy = row.Cell(14).IsEmpty() ? null : row.Cell(14).GetString(),  // ✅ ADD THIS
+                                    AbortReason = row.Cell(15).IsEmpty() ? null : row.Cell(15).GetString(),
+                                    AbortedBy = row.Cell(16).IsEmpty() ? null : row.Cell(16).GetString(),
+                                    AbortedDate = ParseNullableDateTime(row.Cell(17)),
+                                    Notes = row.Cell(18).IsEmpty() ? null : row.Cell(18).GetString()
                                 });
                             }
                             catch (Exception ex)
@@ -242,10 +244,11 @@ namespace FirstWeigh.Services
                 worksheet.Cell(newRow, 11).Value = batch.StartedBy ?? "";
                 worksheet.Cell(newRow, 12).Value = batch.StartedDate.HasValue ? batch.StartedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
                 worksheet.Cell(newRow, 13).Value = batch.CompletedDate.HasValue ? batch.CompletedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                worksheet.Cell(newRow, 14).Value = batch.AbortReason ?? "";
-                worksheet.Cell(newRow, 15).Value = batch.AbortedBy ?? "";
-                worksheet.Cell(newRow, 16).Value = batch.AbortedDate.HasValue ? batch.AbortedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                worksheet.Cell(newRow, 17).Value = batch.Notes ?? "";
+                worksheet.Cell(newRow, 14).Value = batch.CompletedBy ?? "";  // ✅ ADD THIS
+                worksheet.Cell(newRow, 15).Value = batch.AbortReason ?? "";
+                worksheet.Cell(newRow, 16).Value = batch.AbortedBy ?? "";
+                worksheet.Cell(newRow, 17).Value = batch.AbortedDate.HasValue ? batch.AbortedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
+                worksheet.Cell(newRow, 18).Value = batch.Notes ?? "";
 
                 workbook.Save();
 
@@ -279,12 +282,17 @@ namespace FirstWeigh.Services
                         row.Cell(11).Value = batch.StartedBy ?? "";
                         row.Cell(12).Value = batch.StartedDate.HasValue ? batch.StartedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
                         row.Cell(13).Value = batch.CompletedDate.HasValue ? batch.CompletedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                        row.Cell(14).Value = batch.AbortReason ?? "";
-                        row.Cell(15).Value = batch.AbortedBy ?? "";
-                        row.Cell(16).Value = batch.AbortedDate.HasValue ? batch.AbortedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                        row.Cell(17).Value = batch.Notes ?? "";
+                        row.Cell(14).Value = batch.CompletedBy ?? "";  // ✅ MAKE SURE THIS LINE EXISTS!
+                        row.Cell(15).Value = batch.AbortReason ?? "";
+                        row.Cell(16).Value = batch.AbortedBy ?? "";
+                        row.Cell(17).Value = batch.AbortedDate.HasValue ? batch.AbortedDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "";
+                        row.Cell(18).Value = batch.Notes ?? "";
 
                         workbook.Save();
+
+                        // ✅ ADD DEBUG LOG
+                        Console.WriteLine($"✅ Batch {batch.BatchId} updated in Excel - CompletedBy: {batch.CompletedBy}");
+
                         return true;
                     }
                 }
@@ -333,27 +341,36 @@ namespace FirstWeigh.Services
             return await UpdateBatchAsync(batch);
         }
 
-        public async Task<bool> CompleteBatchAsync(string batchId)
+        public async Task<bool> CompleteBatchAsync(string batchId, string completedBy)  // ✅ CORRECT - Add second parameter
         {
             var batch = await GetBatchByIdAsync(batchId);
             if (batch == null || batch.Status != "InProgress") return false;
 
             batch.Status = "Completed";
             batch.CompletedDate = DateTime.Now;
-            batch.CurrentRepetition = batch.TotalRepetitions;
+            batch.CompletedBy = completedBy;  // ✅ Now this works
 
             return await UpdateBatchAsync(batch);
         }
 
         public async Task<bool> AbortBatchAsync(string batchId, string abortedBy, string abortReason)
         {
+            // ✅ ADD VALIDATION
+            if (string.IsNullOrWhiteSpace(abortReason))
+            {
+                Console.WriteLine("❌ ERROR: Abort reason cannot be empty!");
+                return false;
+            }
+
             var batch = await GetBatchByIdAsync(batchId);
             if (batch == null) return false;
 
             batch.Status = "Aborted";
             batch.AbortedBy = abortedBy;
             batch.AbortedDate = DateTime.Now;
-            batch.AbortReason = abortReason;
+            batch.AbortReason = abortReason;  // ✅ This is set
+
+            Console.WriteLine($"🚫 Batch {batchId} aborted by {abortedBy}. Reason: {abortReason}");
 
             return await UpdateBatchAsync(batch);
         }
@@ -365,12 +382,8 @@ namespace FirstWeigh.Services
 
             batch.CurrentRepetition = currentRepetition;
 
-            // Auto-complete if all repetitions done
-            if (currentRepetition >= batch.TotalRepetitions)
-            {
-                batch.Status = "Completed";
-                batch.CompletedDate = DateTime.Now;
-            }
+            // ✅ REMOVED AUTO-COMPLETE - Let WeighingService handle completion properly
+            // The WeighingService will call CompleteBatchAsync with the correct operator
 
             return await UpdateBatchAsync(batch);
         }

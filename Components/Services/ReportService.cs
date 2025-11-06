@@ -752,20 +752,32 @@ namespace FirstWeigh.Services
                     var worksheet = workbook.Worksheet("WeighingDetails");
                     var rows = worksheet.RowsUsed().Skip(1);
 
+                    Console.WriteLine($"🔍 Searching for details with RecordId: {recordId}");
+                    int rowCount = 0;
+
                     foreach (var row in rows)
                     {
-                        if (row.Cell(2).GetString() == recordId)
+                        rowCount++;
+                        var detailRecordId = row.Cell(2).GetString();
+
+                        if (detailRecordId == recordId)
                         {
+                            Console.WriteLine($"✅ Found matching row {rowCount} for {recordId}");
                             try
                             {
-                                details.Add(ParseDetailRow(row));
+                                var detail = ParseDetailRow(row);
+                                details.Add(detail);
+                                Console.WriteLine($"   ✅ Parsed: {detail.IngredientCode}");
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"⚠️ Error parsing detail row: {ex.Message}");
+                                Console.WriteLine($"   ❌ Error parsing row {rowCount}: {ex.Message}");
+                                Console.WriteLine($"   Stack: {ex.StackTrace}");
                             }
                         }
                     }
+
+                    Console.WriteLine($"📊 Total rows checked: {rowCount}, Details found: {details.Count}");
                 }
                 catch (Exception ex)
                 {
@@ -874,24 +886,25 @@ namespace FirstWeigh.Services
                 DetailId = row.Cell(1).GetString(),
                 RecordId = row.Cell(2).GetString(),
                 BatchId = row.Cell(3).GetString(),
-                RepetitionNumber = row.Cell(4).GetValue<int>(),
-                IngredientSequence = row.Cell(5).GetValue<int>(),
+                RepetitionNumber = ParseInt(row.Cell(4)),           // ✅ Safe parsing
+                IngredientSequence = ParseInt(row.Cell(5)),         // ✅ Safe parsing
                 IngredientId = row.Cell(6).GetString(),
                 IngredientCode = row.Cell(7).GetString(),
                 IngredientName = row.Cell(8).GetString(),
-                TargetWeight = row.Cell(9).GetValue<decimal>(),
-                ActualWeight = row.Cell(10).GetValue<decimal>(),
-                MinWeight = row.Cell(12).GetValue<decimal>(),
-                MaxWeight = row.Cell(13).GetValue<decimal>(),
-                ToleranceValue = row.Cell(14).GetValue<decimal>(),
+                TargetWeight = ParseDecimal(row.Cell(9)),           // ✅ Safe parsing
+                ActualWeight = ParseDecimal(row.Cell(10)),          // ✅ Safe parsing
+                                                                    // Skip Column 11 (Deviation) - auto-computed
+                MinWeight = ParseDecimal(row.Cell(12)),             // ✅ Safe parsing
+                MaxWeight = ParseDecimal(row.Cell(13)),             // ✅ Safe parsing
+                ToleranceValue = ParseDecimal(row.Cell(14)),        // ✅ Safe parsing
+                                                                    // Skip Column 15 (IsWithinTolerance) - auto-computed
                 BowlCode = row.Cell(16).GetString(),
                 BowlType = row.Cell(17).GetString(),
-                ScaleNumber = row.Cell(18).GetValue<int>(),
+                ScaleNumber = ParseInt(row.Cell(18)),               // ✅ Safe parsing
                 Unit = row.Cell(19).GetString(),
-                Timestamp = row.Cell(20).GetDateTime()
+                Timestamp = ParseDateTime(row.Cell(20))             // ✅ Safe parsing
             };
         }
-        // ✅ COMPLETE WEIGHING RECORD
         public async Task CompleteWeighingRecordAsync(string recordId, int completedRepetitions)
         {
             await _fileLock.WaitAsync();
@@ -1042,14 +1055,16 @@ namespace FirstWeigh.Services
                                         IngredientName = row.Cell(8).GetString(),
                                         TargetWeight = ParseDecimal(row.Cell(9)),
                                         ActualWeight = ParseDecimal(row.Cell(10)),
-                                        MinWeight = ParseDecimal(row.Cell(11)),
-                                        MaxWeight = ParseDecimal(row.Cell(12)),
-                                        ToleranceValue = ParseDecimal(row.Cell(13)),
-                                        BowlCode = row.Cell(14).GetString(),
-                                        BowlType = row.Cell(15).GetString(),
-                                        ScaleNumber = ParseInt(row.Cell(16)),
-                                        Unit = row.Cell(17).GetString(),
-                                        Timestamp = ParseDateTime(row.Cell(18))
+                                        // ✅ SKIP col 11 (Deviation) - computed property
+                                        MinWeight = ParseDecimal(row.Cell(12)),           // ✅ FIXED!
+                                        MaxWeight = ParseDecimal(row.Cell(13)),           // ✅ FIXED!
+                                        ToleranceValue = ParseDecimal(row.Cell(14)),      // ✅ FIXED!
+                                                                                          // ✅ SKIP col 15 (IsWithinTolerance) - computed property
+                                        BowlCode = row.Cell(16).GetString(),              // ✅ FIXED!
+                                        BowlType = row.Cell(17).GetString(),              // ✅ FIXED!
+                                        ScaleNumber = ParseInt(row.Cell(18)),             // ✅ FIXED!
+                                        Unit = row.Cell(19).GetString(),                  // ✅ FIXED!
+                                        Timestamp = ParseDateTime(row.Cell(20))           // ✅ FIXED!
                                     });
                                 }
                             }
@@ -1146,14 +1161,16 @@ namespace FirstWeigh.Services
                         worksheet.Cell(newRow, 8).Value = detail.IngredientName;
                         worksheet.Cell(newRow, 9).Value = (double)detail.TargetWeight;
                         worksheet.Cell(newRow, 10).Value = (double)detail.ActualWeight;
-                        worksheet.Cell(newRow, 11).Value = (double)detail.MinWeight;
-                        worksheet.Cell(newRow, 12).Value = (double)detail.MaxWeight;
-                        worksheet.Cell(newRow, 13).Value = (double)detail.ToleranceValue;
-                        worksheet.Cell(newRow, 14).Value = detail.BowlCode;
-                        worksheet.Cell(newRow, 15).Value = detail.BowlType;
-                        worksheet.Cell(newRow, 16).Value = detail.ScaleNumber;
-                        worksheet.Cell(newRow, 17).Value = detail.Unit;
-                        worksheet.Cell(newRow, 18).Value = detail.Timestamp;
+                        worksheet.Cell(newRow, 11).Value = (double)detail.Deviation;          // ✅ Deviation
+                        worksheet.Cell(newRow, 12).Value = (double)detail.MinWeight;          // ✅ MinWeight
+                        worksheet.Cell(newRow, 13).Value = (double)detail.MaxWeight;          // ✅ MaxWeight
+                        worksheet.Cell(newRow, 14).Value = (double)detail.ToleranceValue;     // ✅ ToleranceValue
+                        worksheet.Cell(newRow, 15).Value = detail.IsWithinTolerance;          // ✅ IsWithinTolerance - WAS MISSING!
+                        worksheet.Cell(newRow, 16).Value = detail.BowlCode;                   // ✅ BowlCode
+                        worksheet.Cell(newRow, 17).Value = detail.BowlType;                   // ✅ BowlType
+                        worksheet.Cell(newRow, 18).Value = detail.ScaleNumber;                // ✅ ScaleNumber
+                        worksheet.Cell(newRow, 19).Value = detail.Unit;                       // ✅ Unit
+                        worksheet.Cell(newRow, 20).Value = detail.Timestamp;                  // ✅ Timestamp
 
                         workbook.Save();
                         return true;
@@ -1170,7 +1187,6 @@ namespace FirstWeigh.Services
                 _fileLock.Release();
             }
         }
-
         public async Task<bool> UpdateWeighingRecordAsync(WeighingRecord record)
         {
             await _fileLock.WaitAsync();

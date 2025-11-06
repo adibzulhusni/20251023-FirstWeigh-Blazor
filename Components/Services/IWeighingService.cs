@@ -10,6 +10,7 @@ namespace FirstWeigh.Services
         void ClearActiveSession();
         Task<bool> PauseSessionAsync(string batchId);
         Task<bool> AbortSessionAsync(string batchId, string reason, string abortedBy);
+        Task<bool> UpdateSessionOperatorAsync(string batchId, string operatorName);
 
         // Bowl Selection & Verification
         bool SelectBowls(string batchId, string ingredientBowlCode, decimal ingredientBowlWeight,

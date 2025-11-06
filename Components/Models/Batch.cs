@@ -13,6 +13,9 @@
         public DateTime? PlannedStartTime { get; set; }
         public DateTime? PlannedEndTime { get; set; }
 
+        // ✅ ADD THIS LINE
+        public string? CompletedBy { get; set; }
+
         // Audit fields
         public string CreatedBy { get; set; } = string.Empty;
         public DateTime CreatedDate { get; set; }

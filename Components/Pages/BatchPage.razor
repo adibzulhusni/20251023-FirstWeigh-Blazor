@@ -9,7 +9,7 @@
 <style>
     .page-container {
         padding: 32px;
-        max-width: 1400px;
+        max-width: 1600px;
         margin: 0 auto;
     }
 
@@ -82,84 +82,73 @@
             border-color: #4a9eff;
         }
 
-    .table-card {
+    /* Card Grid Layout */
+    .batch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+        gap: 24px;
+    }
+
+    .batch-card {
         background: white;
-        border-radius: 8px;
+        border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
         overflow: hidden;
+        border: 2px solid transparent;
     }
 
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
+        .batch-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border-color: #4a9eff;
+        }
 
-    thead {
-        background-color: #f7fafc;
-    }
-
-    th {
-        padding: 16px;
-        text-align: left;
-        font-size: 13px;
-        font-weight: 600;
-        color: #4a5568;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .card-header {
+        padding: 20px 24px;
+        background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
         border-bottom: 2px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
     }
 
-    td {
-        padding: 16px;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 14px;
+    .card-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
     }
-
-    tbody tr {
-        transition: background-color 0.2s;
-    }
-
-        tbody tr:hover {
-            background-color: #f7fafc;
-        }
-
-        tbody tr:last-child td {
-            border-bottom: none;
-        }
 
     .batch-code {
         font-family: 'Roboto Mono', monospace;
-        font-weight: 600;
+        font-weight: 700;
         color: #1a202c;
-        font-size: 14px;
+        font-size: 18px;
     }
 
     .recipe-name {
         color: #4a5568;
+        font-size: 14px;
+        font-weight: 500;
     }
 
-    .repetition-text {
-        font-family: 'Roboto Mono', monospace;
-        color: #2d3748;
-    }
-
-    .operator-name {
-        color: #4a5568;
-    }
-
-    .no-operator {
-        color: #a0aec0;
-        font-style: italic;
+    .card-header-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
     }
 
     .status-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 12px;
-        border-radius: 12px;
+        padding: 6px 14px;
+        border-radius: 20px;
         font-size: 12px;
         font-weight: 600;
+        white-space: nowrap;
     }
 
     .status-pending {
@@ -167,7 +156,7 @@
         color: #7c2d12;
     }
 
-    .status-in-progress {
+    .status-inprogress {
         background-color: #bee3f8;
         color: #2c5282;
     }
@@ -183,8 +172,8 @@
     }
 
     .status-dot {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
     }
 
@@ -192,7 +181,7 @@
         background-color: #dd6b20;
     }
 
-    .status-in-progress .status-dot {
+    .status-inprogress .status-dot {
         background-color: #3182ce;
     }
 
@@ -204,24 +193,73 @@
         background-color: #e53e3e;
     }
 
-    .date-text {
+    .card-body {
+        padding: 24px;
+    }
+
+    .card-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-label {
+        font-size: 11px;
+        font-weight: 600;
         color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-value {
+        font-size: 14px;
+        color: #2d3748;
+        font-weight: 500;
+    }
+
+    .info-value-code {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        color: #1a202c;
+    }
+
+    .no-value {
+        color: #a0aec0;
+        font-style: italic;
         font-size: 13px;
+    }
+
+    .card-footer {
+        padding: 16px 24px;
+        background-color: #f7fafc;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
     }
 
     .action-buttons {
         display: flex;
         gap: 8px;
+        flex-wrap: wrap;
     }
 
     .btn-action {
-        padding: 6px 12px;
+        padding: 8px 16px;
         border: none;
         border-radius: 6px;
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
+        white-space: nowrap;
     }
 
     .btn-view {
@@ -274,26 +312,43 @@
             cursor: not-allowed;
         }
 
+    .progress-bar-container {
+        width: 100%;
+        height: 8px;
+        background-color: #e2e8f0;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4a9eff 0%, #38a169 100%);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
     .empty-state {
         text-align: center;
-        padding: 60px 20px;
+        padding: 80px 20px;
         color: #718096;
     }
 
     .empty-state-icon {
-        font-size: 48px;
-        margin-bottom: 16px;
+        font-size: 64px;
+        margin-bottom: 24px;
         opacity: 0.3;
     }
 
     .empty-state-text {
-        font-size: 16px;
-        font-weight: 500;
-        margin-bottom: 8px;
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #2d3748;
     }
 
     .empty-state-subtext {
-        font-size: 14px;
+        font-size: 16px;
         color: #a0aec0;
     }
 
@@ -460,21 +515,15 @@
 
     .loading-spinner {
         text-align: center;
-        padding: 40px;
+        padding: 60px 20px;
         color: #718096;
+        font-size: 18px;
     }
 
-    @@media (max-width: 1024px) {
-        .page-container {
-            padding: 20px;
-        }
-
-        table {
-            font-size: 13px;
-        }
-
-        th, td {
-            padding: 12px;
+    /* Responsive */
+    @@media (max-width: 1200px) {
+        .batch-grid {
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
         }
     }
 
@@ -493,12 +542,12 @@
             min-width: 100%;
         }
 
-        .table-card {
-            overflow-x: auto;
+        .batch-grid {
+            grid-template-columns: 1fr;
         }
 
-        table {
-            min-width: 1100px;
+        .card-info-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -532,145 +581,167 @@
         </select>
     </div>
 
-    <!-- Batches Table -->
-    <div class="table-card">
-        @if (isLoading)
-        {
-            <div class="loading-spinner">Loading batches...</div>
-        }
-        else
-        {
-            <table>
-                <thead>
-                    <tr>
-                        <th>Batch Code</th>
-                        <th>Recipe</th>
-                        <th>Status</th>
-                        <th>Repetitions</th>
-                        <th>Start Date (Planned)</th>
-                        <th>End Date (Planned)</th>
-                        <th>Start Date (Actual)</th>
-                        <th>End Date (Actual)</th>
-                        <th>Created By</th>
-                        <th>Created Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!filteredBatches.Any())
-                    {
-                        <tr>
-                            <td colspan="11">
-                                <div class="empty-state">
-                                    <div class="empty-state-icon">📦</div>
-                                    <div class="empty-state-text">No batches found</div>
-                                    <div class="empty-state-subtext">Click "+ Create Batch" to start a new production batch</div>
+    <!-- Batches Grid -->
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Loading batches...</div>
+    }
+    else if (!filteredBatches.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">📦</div>
+            <div class="empty-state-text">No batches found</div>
+            <div class="empty-state-subtext">Click "+ Create Batch" to start a new production batch</div>
+        </div>
+    }
+    else
+    {
+        <div class="batch-grid">
+            @foreach (var batch in filteredBatches)
+            {
+                <div class="batch-card">
+                    <!-- Card Header -->
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <span class="batch-code">@batch.BatchId</span>
+                            <span class="recipe-name">@batch.RecipeName</span>
+                        </div>
+                        <div class="card-header-right">
+                            <span class="status-badge status-@(batch.Status.ToLower().Replace(" ", ""))">
+                                <span class="status-dot"></span>
+                                @(batch.Status == "InProgress" ? "In Progress" : batch.Status)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="card-body">
+                        <div class="card-info-grid">
+                            <!-- Repetitions with Progress Bar -->
+                            <div class="info-item" style="grid-column: 1 / -1;">
+                                <span class="info-label">Progress</span>
+                                <span class="info-value-code">@batch.CurrentRepetition / @batch.TotalRepetitions repetitions</span>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-fill" style="width: @batch.ProgressPercentage%"></div>
                                 </div>
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var batch in filteredBatches)
-                        {
-                            <tr>
-                                <td>
-                                    <span class="batch-code">@batch.BatchId</span>
-                                </td>
-                                <td>
-                                    <span class="recipe-name">@batch.RecipeName</span>
-                                </td>
-                                <td>
-                                    <span class="status-badge status-@(batch.Status == "InProgress" ? "in-progress" : batch.Status.ToLower())">
-                                        <span class="status-dot"></span>
-                                        @(batch.Status == "InProgress" ? "In Progress" : batch.Status)
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="repetition-text">@batch.CurrentRepetition / @batch.TotalRepetitions</span>
-                                </td>
-                                <td>
-                                    @if (batch.PlannedStartTime.HasValue)
-                                    {
-                                        <span class="date-text">@batch.PlannedStartTime.Value.ToString("MMM dd, yyyy HH:mm")</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="no-operator">-</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (batch.PlannedEndTime.HasValue)
-                                    {
-                                        <span class="date-text">@batch.PlannedEndTime.Value.ToString("MMM dd, yyyy HH:mm")</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="no-operator">-</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (batch.StartedDate.HasValue)
-                                    {
-                                        <span class="date-text">@batch.StartedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="no-operator">-</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (batch.CompletedDate.HasValue)
-                                    {
-                                        <span class="date-text">@batch.CompletedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
-                                    }
-                                    else if (batch.AbortedDate.HasValue)
-                                    {
-                                        <span class="date-text">@batch.AbortedDate.Value.ToString("MMM dd, yyyy HH:mm")</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="no-operator">-</span>
-                                    }
-                                </td>
-                                <td>
-                                    @if (string.IsNullOrEmpty(batch.StartedBy))
-                                    {
-                                        <span class="no-operator">Not assigned</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="operator-name">@batch.StartedBy</span>
-                                    }
-                                </td>
-                                <td>
-                                    <span class="date-text">@batch.CreatedDate.ToString("MMM dd, yyyy HH:mm")</span>
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-action btn-view" @onclick="() => ViewBatchDetails(batch)">View</button>
-                                        @if (batch.Status == "Pending")
-                                        {
-                                            <button class="btn-action btn-start" @onclick="() => StartBatch(batch.BatchId)"
-                                                    disabled="@(!canStartNewBatch)">
-                                                Start
-                                            </button>
-                                            <button class="btn-action btn-edit" @onclick="() => OpenEditModal(batch)">Edit</button>
-                                            <button class="btn-action btn-delete" @onclick="() => ConfirmDelete(batch.BatchId)">Delete</button>
-                                        }
-                                        else if (batch.Status == "InProgress")
-                                        {
-                                            <button class="btn-action btn-abort" @onclick="() => OpenAbortModal(batch)">Abort</button>
-                                        }
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        }
-    </div>
+                            </div>
+
+                            <!-- Planned Dates -->
+                            <div class="info-item">
+                                <span class="info-label">Start Planned</span>
+                                @if (batch.PlannedStartTime.HasValue)
+                                {
+                                    <span class="info-value">@batch.PlannedStartTime.Value.ToString("MMM dd, HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span class="no-value">Not set</span>
+                                }
+                            </div>
+
+                            <div class="info-item">
+                                <span class="info-label">End Planned</span>
+                                @if (batch.PlannedEndTime.HasValue)
+                                {
+                                    <span class="info-value">@batch.PlannedEndTime.Value.ToString("MMM dd, HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span class="no-value">Not set</span>
+                                }
+                            </div>
+
+                            <!-- Actual Dates -->
+                            <div class="info-item">
+                                <span class="info-label">Started</span>
+                                @if (batch.StartedDate.HasValue)
+                                {
+                                    <span class="info-value">@batch.StartedDate.Value.ToString("MMM dd, HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span class="no-value">Not started</span>
+                                }
+                            </div>
+
+                            <div class="info-item">
+                                <span class="info-label">@(batch.Status == "Aborted" ? "Aborted" : "Completed")</span>
+                                @if (batch.CompletedDate.HasValue)
+                                {
+                                    <span class="info-value">@batch.CompletedDate.Value.ToString("MMM dd, HH:mm")</span>
+                                }
+                                else if (batch.AbortedDate.HasValue)
+                                {
+                                    <span class="info-value">@batch.AbortedDate.Value.ToString("MMM dd, HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span class="no-value">—</span>
+                                }
+                            </div>
+
+                            <!-- People -->
+                            <div class="info-item">
+                                <span class="info-label">Created By</span>
+                                <span class="info-value">@batch.CreatedBy</span>
+                            </div>
+
+                            <div class="info-item">
+                                <span class="info-label">Created Date</span>
+                                <span class="info-value">@batch.CreatedDate.ToString("MMM dd, yyyy")</span>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(batch.CompletedBy))
+                            {
+                                <div class="info-item">
+                                    <span class="info-label">Completed By</span>
+                                    <span class="info-value">@batch.CompletedBy</span>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(batch.AbortReason))
+                            {
+                                <div class="info-item" style="grid-column: 1 / -1;">
+                                    <span class="info-label">Abort Reason</span>
+                                    <span class="info-value">@batch.AbortReason</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Card Footer with Actions -->
+                    <div class="card-footer">
+                        <div class="action-buttons">
+                            <button class="btn-action btn-view" @onclick="() => ViewBatchDetails(batch)">
+                                View
+                            </button>
+
+                            @if (batch.Status == "Pending")
+                            {
+                                <button class="btn-action btn-start"
+                                        @onclick="() => StartBatch(batch.BatchId)"
+                                        disabled="@(!canStartNewBatch)">
+                                    Start
+                                </button>
+                                <button class="btn-action btn-edit" @onclick="() => OpenEditModal(batch)">
+                                    Edit
+                                </button>
+                                <button class="btn-action btn-delete" @onclick="() => ConfirmDelete(batch.BatchId)">
+                                    Delete
+                                </button>
+                            }
+                            else if (batch.Status == "InProgress")
+                            {
+                                <button class="btn-action btn-abort" @onclick="() => OpenAbortModal(batch)">
+                                    Abort
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
 
 <!-- Create/Edit Modal -->
@@ -816,7 +887,6 @@
         </div>
     </div>
 }
-
 <!-- View Details Modal -->
 @if (showDetailsModal && selectedBatch != null)
 {
@@ -828,6 +898,7 @@
             </div>
             <div class="modal-body">
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                    <!-- Batch Info -->
                     <div>
                         <label class="form-label">Batch Code</label>
                         <div class="batch-code">@selectedBatch.BatchId</div>
@@ -836,6 +907,8 @@
                         <label class="form-label">Recipe</label>
                         <div>@selectedBatch.RecipeName</div>
                     </div>
+
+                    <!-- Status -->
                     <div>
                         <label class="form-label">Status</label>
                         <div>
@@ -845,10 +918,14 @@
                             </span>
                         </div>
                     </div>
+
+                    <!-- Progress -->
                     <div>
                         <label class="form-label">Progress</label>
                         <div>@selectedBatch.CurrentRepetition / @selectedBatch.TotalRepetitions repetitions (@selectedBatch.ProgressPercentage.ToString("F0")%)</div>
                     </div>
+
+                    <!-- Created Info -->
                     <div>
                         <label class="form-label">Created By</label>
                         <div>@selectedBatch.CreatedBy</div>
@@ -857,6 +934,8 @@
                         <label class="form-label">Created Date</label>
                         <div>@selectedBatch.CreatedDate.ToString("MMM dd, yyyy HH:mm:ss")</div>
                     </div>
+
+                    <!-- Started Info (only if started) -->
                     @if (!string.IsNullOrEmpty(selectedBatch.StartedBy))
                     {
                         <div>
@@ -868,13 +947,21 @@
                             <div>@selectedBatch.StartedDate?.ToString("MMM dd, yyyy HH:mm:ss")</div>
                         </div>
                     }
+
+                    <!-- Completed Info (only if completed) -->
                     @if (selectedBatch.CompletedDate.HasValue)
                     {
+                        <div>
+                            <label class="form-label">Completed By</label>
+                            <div>@(!string.IsNullOrEmpty(selectedBatch.CompletedBy) ? selectedBatch.CompletedBy : "—")</div>
+                        </div>
                         <div>
                             <label class="form-label">Completed Date</label>
                             <div>@selectedBatch.CompletedDate?.ToString("MMM dd, yyyy HH:mm:ss")</div>
                         </div>
                     }
+
+                    <!-- Aborted Info (only if aborted) -->
                     @if (!string.IsNullOrEmpty(selectedBatch.AbortedBy))
                     {
                         <div>
@@ -890,6 +977,8 @@
                             <div>@selectedBatch.AbortReason</div>
                         </div>
                     }
+
+                    <!-- Notes (if exists) -->
                     @if (!string.IsNullOrEmpty(selectedBatch.Notes))
                     {
                         <div style="grid-column: 1 / -1;">
