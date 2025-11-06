@@ -926,5 +926,346 @@ namespace FirstWeigh.Services
                 _fileLock.Release();
             }
         }
+        // Add these methods to your ReportService class
+
+        public async Task<List<WeighingRecord>> GetAllWeighingRecordsAsync()
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    var records = new List<WeighingRecord>();
+
+                    if (!File.Exists(_recordsFilePath))
+                    {
+                        return records;
+                    }
+
+                    using (var workbook = new XLWorkbook(_recordsFilePath))
+                    {
+                        var worksheet = workbook.Worksheet("WeighingRecords");
+                        var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1);
+
+                        if (rows == null) return records;
+
+                        foreach (var row in rows)
+                        {
+                            try
+                            {
+                                records.Add(new WeighingRecord
+                                {
+                                    RecordId = row.Cell(1).GetString(),
+                                    BatchId = row.Cell(2).GetString(),
+                                    RecipeId = row.Cell(3).GetString(),
+                                    RecipeCode = row.Cell(4).GetString(),
+                                    RecipeName = row.Cell(5).GetString(),
+                                    OperatorName = row.Cell(6).GetString(),
+                                    SessionStartTime = ParseDateTime(row.Cell(7)),
+                                    SessionEndTime = ParseNullableDateTime(row.Cell(8)),
+                                    TotalRepetitions = ParseInt(row.Cell(9)),
+                                    CompletedRepetitions = ParseInt(row.Cell(10)),
+                                    Status = row.Cell(11).GetString(),
+                                    AbortReason = row.Cell(12).IsEmpty() ? null : row.Cell(12).GetString(),
+                                    AbortedBy = row.Cell(13).IsEmpty() ? null : row.Cell(13).GetString(),
+                                    AbortedDate = ParseNullableDateTime(row.Cell(14)),
+                                    TotalIngredientsWeighed = ParseInt(row.Cell(15)),
+                                    IngredientsWithinTolerance = ParseInt(row.Cell(16)),
+                                    IngredientsOutOfTolerance = ParseInt(row.Cell(17)),
+                                    AverageDeviation = ParseDecimal(row.Cell(18)),
+                                    MaxDeviation = ParseDecimal(row.Cell(19)),
+                                    CreatedDate = ParseDateTime(row.Cell(20)),
+                                    CreatedBy = row.Cell(21).GetString(),
+                                    PlannedStartTime = ParseNullableDateTime(row.Cell(22)),
+                                    PlannedEndTime = ParseNullableDateTime(row.Cell(23))
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error parsing record row: {ex.Message}");
+                            }
+                        }
+                    }
+
+                    return records;
+                });
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
+        public async Task<WeighingRecord?> GetWeighingRecordByIdAsync(string recordId)
+        {
+            var allRecords = await GetAllWeighingRecordsAsync();
+            return allRecords.FirstOrDefault(r => r.RecordId == recordId);
+        }
+
+        public async Task<List<WeighingDetail>> GetWeighingDetailsByRecordIdAsync(string recordId)
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    var details = new List<WeighingDetail>();
+
+                    if (!File.Exists(_detailsFilePath))
+                    {
+                        return details;
+                    }
+
+                    using (var workbook = new XLWorkbook(_detailsFilePath))
+                    {
+                        var worksheet = workbook.Worksheet("WeighingDetails");
+                        var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1);
+
+                        if (rows == null) return details;
+
+                        foreach (var row in rows)
+                        {
+                            try
+                            {
+                                var detailRecordId = row.Cell(2).GetString();
+                                if (detailRecordId == recordId)
+                                {
+                                    details.Add(new WeighingDetail
+                                    {
+                                        DetailId = row.Cell(1).GetString(),
+                                        RecordId = detailRecordId,
+                                        BatchId = row.Cell(3).GetString(),
+                                        RepetitionNumber = ParseInt(row.Cell(4)),
+                                        IngredientSequence = ParseInt(row.Cell(5)),
+                                        IngredientId = row.Cell(6).GetString(),
+                                        IngredientCode = row.Cell(7).GetString(),
+                                        IngredientName = row.Cell(8).GetString(),
+                                        TargetWeight = ParseDecimal(row.Cell(9)),
+                                        ActualWeight = ParseDecimal(row.Cell(10)),
+                                        MinWeight = ParseDecimal(row.Cell(11)),
+                                        MaxWeight = ParseDecimal(row.Cell(12)),
+                                        ToleranceValue = ParseDecimal(row.Cell(13)),
+                                        BowlCode = row.Cell(14).GetString(),
+                                        BowlType = row.Cell(15).GetString(),
+                                        ScaleNumber = ParseInt(row.Cell(16)),
+                                        Unit = row.Cell(17).GetString(),
+                                        Timestamp = ParseDateTime(row.Cell(18))
+                                    });
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error parsing detail row: {ex.Message}");
+                            }
+                        }
+                    }
+
+                    return details;
+                });
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
+        public async Task<bool> SaveWeighingRecordAsync(WeighingRecord record)
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    using (var workbook = new XLWorkbook(_recordsFilePath))
+                    {
+                        var worksheet = workbook.Worksheet("WeighingRecords");
+                        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+                        var newRow = lastRow + 1;
+
+                        worksheet.Cell(newRow, 1).Value = record.RecordId;
+                        worksheet.Cell(newRow, 2).Value = record.BatchId;
+                        worksheet.Cell(newRow, 3).Value = record.RecipeId;
+                        worksheet.Cell(newRow, 4).Value = record.RecipeCode;
+                        worksheet.Cell(newRow, 5).Value = record.RecipeName;
+                        worksheet.Cell(newRow, 6).Value = record.OperatorName;
+                        worksheet.Cell(newRow, 7).Value = record.SessionStartTime;
+                        worksheet.Cell(newRow, 8).Value = record.SessionEndTime;
+                        worksheet.Cell(newRow, 9).Value = record.TotalRepetitions;
+                        worksheet.Cell(newRow, 10).Value = record.CompletedRepetitions;
+                        worksheet.Cell(newRow, 11).Value = record.Status;
+                        worksheet.Cell(newRow, 12).Value = record.AbortReason ?? "";
+                        worksheet.Cell(newRow, 13).Value = record.AbortedBy ?? "";
+                        worksheet.Cell(newRow, 14).Value = record.AbortedDate;
+                        worksheet.Cell(newRow, 15).Value = record.TotalIngredientsWeighed;
+                        worksheet.Cell(newRow, 16).Value = record.IngredientsWithinTolerance;
+                        worksheet.Cell(newRow, 17).Value = record.IngredientsOutOfTolerance;
+                        worksheet.Cell(newRow, 18).Value = (double)record.AverageDeviation;
+                        worksheet.Cell(newRow, 19).Value = (double)record.MaxDeviation;
+                        worksheet.Cell(newRow, 20).Value = record.CreatedDate;
+                        worksheet.Cell(newRow, 21).Value = record.CreatedBy;
+                        worksheet.Cell(newRow, 22).Value = record.PlannedStartTime;
+                        worksheet.Cell(newRow, 23).Value = record.PlannedEndTime;
+
+                        workbook.Save();
+                        Console.WriteLine($"✅ WeighingRecord saved: {record.RecordId}");
+                        return true;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error saving WeighingRecord: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
+        public async Task<bool> SaveWeighingDetailAsync(WeighingDetail detail)
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    using (var workbook = new XLWorkbook(_detailsFilePath))
+                    {
+                        var worksheet = workbook.Worksheet("WeighingDetails");
+                        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+                        var newRow = lastRow + 1;
+
+                        worksheet.Cell(newRow, 1).Value = detail.DetailId;
+                        worksheet.Cell(newRow, 2).Value = detail.RecordId;
+                        worksheet.Cell(newRow, 3).Value = detail.BatchId;
+                        worksheet.Cell(newRow, 4).Value = detail.RepetitionNumber;
+                        worksheet.Cell(newRow, 5).Value = detail.IngredientSequence;
+                        worksheet.Cell(newRow, 6).Value = detail.IngredientId;
+                        worksheet.Cell(newRow, 7).Value = detail.IngredientCode;
+                        worksheet.Cell(newRow, 8).Value = detail.IngredientName;
+                        worksheet.Cell(newRow, 9).Value = (double)detail.TargetWeight;
+                        worksheet.Cell(newRow, 10).Value = (double)detail.ActualWeight;
+                        worksheet.Cell(newRow, 11).Value = (double)detail.MinWeight;
+                        worksheet.Cell(newRow, 12).Value = (double)detail.MaxWeight;
+                        worksheet.Cell(newRow, 13).Value = (double)detail.ToleranceValue;
+                        worksheet.Cell(newRow, 14).Value = detail.BowlCode;
+                        worksheet.Cell(newRow, 15).Value = detail.BowlType;
+                        worksheet.Cell(newRow, 16).Value = detail.ScaleNumber;
+                        worksheet.Cell(newRow, 17).Value = detail.Unit;
+                        worksheet.Cell(newRow, 18).Value = detail.Timestamp;
+
+                        workbook.Save();
+                        return true;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error saving WeighingDetail: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
+        public async Task<bool> UpdateWeighingRecordAsync(WeighingRecord record)
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    using (var workbook = new XLWorkbook(_recordsFilePath))
+                    {
+                        var worksheet = workbook.Worksheet("WeighingRecords");
+                        var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1);
+
+                        if (rows == null) return false;
+
+                        foreach (var row in rows)
+                        {
+                            if (row.Cell(1).GetString() == record.RecordId)
+                            {
+                                // Update all fields
+                                row.Cell(2).Value = record.BatchId;
+                                row.Cell(3).Value = record.RecipeId;
+                                row.Cell(4).Value = record.RecipeCode;
+                                row.Cell(5).Value = record.RecipeName;
+                                row.Cell(6).Value = record.OperatorName;
+                                row.Cell(7).Value = record.SessionStartTime;
+                                row.Cell(8).Value = record.SessionEndTime;
+                                row.Cell(9).Value = record.TotalRepetitions;
+                                row.Cell(10).Value = record.CompletedRepetitions;
+                                row.Cell(11).Value = record.Status;
+                                row.Cell(12).Value = record.AbortReason ?? "";
+                                row.Cell(13).Value = record.AbortedBy ?? "";
+                                row.Cell(14).Value = record.AbortedDate;
+                                row.Cell(15).Value = record.TotalIngredientsWeighed;
+                                row.Cell(16).Value = record.IngredientsWithinTolerance;
+                                row.Cell(17).Value = record.IngredientsOutOfTolerance;
+                                row.Cell(18).Value = (double)record.AverageDeviation;
+                                row.Cell(19).Value = (double)record.MaxDeviation;
+                                row.Cell(20).Value = record.CreatedDate;
+                                row.Cell(21).Value = record.CreatedBy;
+                                row.Cell(22).Value = record.PlannedStartTime;
+                                row.Cell(23).Value = record.PlannedEndTime;
+
+                                workbook.Save();
+                                Console.WriteLine($"✅ WeighingRecord updated: {record.RecordId}");
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error updating WeighingRecord: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
+        // Helper methods (add these if they don't exist)
+        private int ParseInt(IXLCell cell)
+        {
+            if (cell.IsEmpty()) return 0;
+            if (cell.TryGetValue(out int intValue)) return intValue;
+            if (cell.TryGetValue(out double doubleValue)) return (int)doubleValue;
+            if (int.TryParse(cell.GetString(), out int result)) return result;
+            return 0;
+        }
+
+        private decimal ParseDecimal(IXLCell cell)
+        {
+            if (cell.IsEmpty()) return 0;
+            if (cell.TryGetValue(out double doubleValue)) return (decimal)doubleValue;
+            if (decimal.TryParse(cell.GetString(), out decimal result)) return result;
+            return 0;
+        }
+
+        private DateTime ParseDateTime(IXLCell cell)
+        {
+            if (cell.IsEmpty()) return DateTime.Now;
+            if (cell.TryGetValue(out DateTime dateValue)) return dateValue;
+            if (DateTime.TryParse(cell.GetString(), out DateTime result)) return result;
+            return DateTime.Now;
+        }
+
+        private DateTime? ParseNullableDateTime(IXLCell cell)
+        {
+            if (cell.IsEmpty()) return null;
+            if (cell.TryGetValue(out DateTime dateValue)) return dateValue;
+            if (DateTime.TryParse(cell.GetString(), out DateTime result)) return result;
+            return null;
+        }
     }
 }

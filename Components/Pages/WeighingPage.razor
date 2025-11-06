@@ -797,7 +797,7 @@
                     @if (isInTransferStage)
                     {
                         <div style="margin-top: 24px; padding: 20px; background: @(transferWeightMatches ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fff3cd, #ffeaa7)");
-                                                            border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
+                                                                        border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
                             <div style="text-align: center;">
                                 <div style="font-size: 32px; margin-bottom: 8px;">
                                     @(transferWeightMatches ? "✅" : "⏳")
@@ -815,8 +815,8 @@
                                 disabled="@(!transferWeightMatches)"
                                 @onclick="ConfirmTransfer"
                                 style="margin-top: 20px; background: @(transferWeightMatches ? "#28a745" : "#cbd5e0");
-                                                               cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
-                                                               opacity: @(transferWeightMatches ? "1" : "0.5");">
+                                                                           cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
+                                                                           opacity: @(transferWeightMatches ? "1" : "0.5");">
                             @(transferWeightMatches ? "✓ COMPLETE TRANSFER" : "⏳ WAITING FOR CORRECT WEIGHT...")
                         </button>
                     }
@@ -873,8 +873,8 @@
                 </p>
 
                 <div style="padding: 20px; border-radius: 12px; margin-bottom: 24px;
-                                    background: @(isScale2Clear ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fed7d7, #fc8181)");
-                                    border: 3px solid @(isScale2Clear ? "#48bb78" : "#f56565");">
+                                        background: @(isScale2Clear ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fed7d7, #fc8181)");
+                                        border: 3px solid @(isScale2Clear ? "#48bb78" : "#f56565");">
                     <div style="font-size: 32px; margin-bottom: 8px;">
                         @(isScale2Clear ? "✅" : "⚠️")
                     </div>
@@ -892,9 +892,9 @@
                         @onclick="CompleteBowlRemoval"
                         disabled="@(!isScale2Clear)"
                         style="background: @(isScale2Clear ? "#28a745" : "#cbd5e0");
-                                       padding: 12px 32px;
-                                       cursor: @(isScale2Clear ? "pointer" : "not-allowed");
-                                       opacity: @(isScale2Clear ? "1" : "0.6");">
+                                           padding: 12px 32px;
+                                           cursor: @(isScale2Clear ? "pointer" : "not-allowed");
+                                           opacity: @(isScale2Clear ? "1" : "0.6");">
                     @(isScale2Clear ? "✓ Complete Batch" : "⏳ Waiting...")
                 </button>
             </div>
@@ -1198,67 +1198,52 @@
 
     private async Task ConfirmTransfer()
     {
-        if (session == null || !transferWeightMatches) return;
+        if (session == null) return;
 
-        var completed = await WeighingService.ConfirmTransferAsync(session.BatchId, scale2Weight);
+        // ✅ NEW: Use tuple deconstruction for the enhanced return type
+        var (success, message, deviation) = await WeighingService.ConfirmTransferAsync(
+            session.BatchId,
+            scale2Weight);
 
-        if (completed)
+        if (!success)
         {
-            isInTransferStage = false;
-            transferWeightMatches = false;
+            // Transfer failed - show error message
+            await JSRuntime.InvokeVoidAsync("alert", message);
+            return;
+        }
 
-            // ✅ CRITICAL: Refresh session - it might have been nulled by the service
-            session = WeighingService.GetActiveSession();
+        // ✅ Transfer succeeded
+        isInTransferStage = false;
+        transferWeightMatches = false;
 
-            // ✅ If session is now null, batch is complete!
-            if (session == null)
-            {
-                StopModbusReading();
-                await JSRuntime.InvokeVoidAsync("alert", "🎉 Batch completed successfully!");
-                Navigation.NavigateTo("/production");
-                return;
-            }
+        // ✅ Refresh session - it might have been nulled by the service
+        session = WeighingService.GetActiveSession();
 
-            // Check if starting a new repetition (CurrentIngredientIndex was reset to 0)
-            if (session.CurrentIngredientIndex == 0)
-            {
-                // ✅ NEW REPETITION - Reset BOTH bowls
-                await JSRuntime.InvokeVoidAsync("alert",
-                    $"✅ Repetition {session.CurrentRepetition - 1} Complete!\n\n" +
-                    $"Starting Repetition {session.CurrentRepetition} of {session.TotalRepetitions}\n\n" +
-                    "Please select and verify BOTH bowls again.");
+        // ✅ If session is now null, batch is complete!
+        if (session == null)
+        {
+            StopModbusReading();
+            await JSRuntime.InvokeVoidAsync("alert", "🎉 Batch completed successfully!");
+            Navigation.NavigateTo("/production");
+            return;
+        }
 
-                // Reset ALL bowl selection states
-                selectedIngredientBowlCode = string.Empty;
-                selectedIngredientBowlWeight = 0;
-                ingredientBowlVerified = false;
-                selectedMixingBowlCode = string.Empty;
-                selectedMixingBowlWeight = 0;
-                mixingBowlVerified = false;
-
-                await LoadAvailableBowls();
-
-                if (session != null)
-                {
-                    session.CurrentStage = WeighingStage.PlaceBowls;
-                }
-
-                UpdateStatus();
-                StateHasChanged();
-                return;
-            }
-
-            // Not new repetition - just next ingredient (mixing bowl stays)
+        // Check if starting a new repetition (CurrentIngredientIndex was reset to 0)
+        if (session.CurrentIngredientIndex == 0)
+        {
+            // ✅ NEW REPETITION - Reset BOTH bowls
             await JSRuntime.InvokeVoidAsync("alert",
-                "✅ Transfer Complete!\n\n" +
-                "Remove ingredient bowl from Scale 1.\n" +
-                "Mixing bowl stays on Scale 2.\n\n" +
-                $"Ready for next ingredient.");
+                $"✅ Repetition {session.CurrentRepetition - 1} Complete!\n\n" +
+                $"Starting Repetition {session.CurrentRepetition} of {session.TotalRepetitions}\n\n" +
+                "Please select and verify BOTH bowls again.");
 
-            // Only reset ingredient bowl
+            // Reset ALL bowl selection states
             selectedIngredientBowlCode = string.Empty;
             selectedIngredientBowlWeight = 0;
             ingredientBowlVerified = false;
+            selectedMixingBowlCode = string.Empty;
+            selectedMixingBowlWeight = 0;
+            mixingBowlVerified = false;
 
             await LoadAvailableBowls();
 
@@ -1269,7 +1254,31 @@
 
             UpdateStatus();
             StateHasChanged();
+            return;
         }
+
+        // Not new repetition - just next ingredient (mixing bowl stays)
+        await JSRuntime.InvokeVoidAsync("alert",
+            $"✅ Transfer Complete!\n\n" +
+            $"Deviation: {deviation:+0.000;-0.000} kg\n\n" +
+            "Remove ingredient bowl from Scale 1.\n" +
+            "Mixing bowl stays on Scale 2.\n\n" +
+            $"Ready for next ingredient.");
+
+        // Only reset ingredient bowl
+        selectedIngredientBowlCode = string.Empty;
+        selectedIngredientBowlWeight = 0;
+        ingredientBowlVerified = false;
+
+        await LoadAvailableBowls();
+
+        if (session != null)
+        {
+            session.CurrentStage = WeighingStage.PlaceBowls;
+        }
+
+        UpdateStatus();
+        StateHasChanged();
     }
 
     private async Task CompleteBowlRemoval()

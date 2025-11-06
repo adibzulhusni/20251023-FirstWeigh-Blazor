@@ -1,5 +1,4 @@
 ﻿using FluentModbus;
-using Microsoft.Win32;
 
 namespace FirstWeigh.Services
 {
@@ -19,12 +18,18 @@ namespace FirstWeigh.Services
         public decimal Scale1Weight { get; private set; }
         public decimal Scale2Weight { get; private set; }
 
+        // ✅ NEW: Weight history for stability checking
+        private readonly List<decimal> _scale1History = new();
+        private readonly List<decimal> _scale2History = new();
+        private const int HISTORY_SIZE = 5;
+
         // Connection status
         public bool Scale1Connected { get; private set; }
         public bool Scale2Connected { get; private set; }
         public bool IsConnected => _plcClient?.IsConnected ?? false;
 
         public string PlcIpAddress => _plcIpAddress;
+
         // Events
         public event Action<decimal, decimal>? WeightUpdated;
 
@@ -48,7 +53,6 @@ namespace FirstWeigh.Services
             {
                 _plcClient = new ModbusTcpClient();
 
-                // ✅ Connect directly without Task.Run wrapper
                 Console.WriteLine($"🔌 Attempting to connect to PLC at {_plcIpAddress}...");
 
                 _plcClient.Connect(_plcIpAddress, ModbusEndianness.BigEndian);
@@ -92,7 +96,6 @@ namespace FirstWeigh.Services
             }
             catch (Exception ex)
             {
-                // ✅ This will now catch the connection timeout exception
                 Console.WriteLine($"❌ Failed to connect to PLC at {_plcIpAddress}");
                 Console.WriteLine($"   Error: {ex.Message}");
 
@@ -123,6 +126,10 @@ namespace FirstWeigh.Services
 
             Console.WriteLine("🔄 Starting Modbus polling...");
 
+            // ✅ Clear history at start
+            _scale1History.Clear();
+            _scale2History.Clear();
+
             try
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -135,6 +142,7 @@ namespace FirstWeigh.Services
                             try
                             {
                                 Scale1Weight = await ReadScaleWeightAsync(_scale1RegisterAddress);
+                                UpdateWeightHistory(_scale1History, Scale1Weight);
                             }
                             catch (Exception ex)
                             {
@@ -149,6 +157,7 @@ namespace FirstWeigh.Services
                             try
                             {
                                 Scale2Weight = await ReadScaleWeightAsync(_scale2RegisterAddress);
+                                UpdateWeightHistory(_scale2History, Scale2Weight);
                             }
                             catch (Exception ex)
                             {
@@ -165,16 +174,13 @@ namespace FirstWeigh.Services
                     }
                     catch (OperationCanceledException)
                     {
-                        // ✅ Expected - cancellation requested, exit cleanly
                         Console.WriteLine("⏹️ Modbus polling cancelled");
                         break;
                     }
                     catch (Exception ex)
                     {
-                        // ⚠️ Unexpected error - log and retry
                         Console.WriteLine($"❌ Unexpected error in Modbus loop: {ex.Message}");
 
-                        // Check if cancelled before retrying
                         if (cancellationToken.IsCancellationRequested)
                             break;
 
@@ -184,7 +190,6 @@ namespace FirstWeigh.Services
             }
             catch (OperationCanceledException)
             {
-                // Normal cancellation at outer level
                 Console.WriteLine("⏹️ Modbus polling stopped");
             }
             finally
@@ -208,7 +213,7 @@ namespace FirstWeigh.Services
                     2
                 );
 
-                // Convert to weight - OPTION 1: 32-bit IEEE 754 Float (Most common)
+                // Convert to weight - 32-bit IEEE 754 Float (Most common)
                 var bytes = new byte[4];
                 bytes[0] = (byte)(registers[1] & 0xFF);
                 bytes[1] = (byte)((registers[1] >> 8) & 0xFF);
@@ -217,14 +222,6 @@ namespace FirstWeigh.Services
                 float weight = BitConverter.ToSingle(bytes, 0);
 
                 return await Task.FromResult((decimal)weight);
-
-                // OPTION 2: 16-bit integer (scaled) - Uncomment if your PLC uses this format
-                // int rawWeight = registers[0];
-                // return await Task.FromResult(rawWeight / 1000m); // If weight is in grams
-
-                // OPTION 3: 32-bit integer - Uncomment if your PLC uses this format
-                // int rawWeight = (registers[0] << 16) | registers[1];
-                // return await Task.FromResult(rawWeight / 1000m);
             }
             catch (Exception ex)
             {
@@ -242,8 +239,6 @@ namespace FirstWeigh.Services
             {
                 // Send tare command to PLC
                 // IMPORTANT: Update these register addresses based on your PLC configuration
-                // This is just an example - you need to check your PLC's Modbus map
-
                 ushort tareRegister = scaleNumber == 1 ? (ushort)100 : (ushort)101;
 
                 await Task.Run(() =>
@@ -258,10 +253,60 @@ namespace FirstWeigh.Services
             }
         }
 
+        // ✅ NEW: Check if Scale 1 is stable
+        public bool IsScale1Stable(decimal tolerance = 0.005m)
+        {
+            if (_scale1History.Count < 3) return false;
+
+            var max = _scale1History.Max();
+            var min = _scale1History.Min();
+            var range = max - min;
+
+            return range <= tolerance;
+        }
+
+        // ✅ NEW: Check if Scale 2 is stable
+        public bool IsScale2Stable(decimal tolerance = 0.005m)
+        {
+            if (_scale2History.Count < 3) return false;
+
+            var max = _scale2History.Max();
+            var min = _scale2History.Min();
+            var range = max - min;
+
+            return range <= tolerance;
+        }
+
+        // ✅ NEW: Get Scale 2 history for external stability checks
+        public List<decimal> GetScale2History()
+        {
+            return new List<decimal>(_scale2History);
+        }
+
+        // ✅ NEW: Get Scale 1 history
+        public List<decimal> GetScale1History()
+        {
+            return new List<decimal>(_scale1History);
+        }
+
+        // ✅ PRIVATE: Update weight history
+        private void UpdateWeightHistory(List<decimal> history, decimal newWeight)
+        {
+            history.Add(newWeight);
+            if (history.Count > HISTORY_SIZE)
+            {
+                history.RemoveAt(0);
+            }
+        }
+
         public void Disconnect()
         {
             Scale1Connected = false;
             Scale2Connected = false;
+
+            // Clear history
+            _scale1History.Clear();
+            _scale2History.Clear();
 
             if (_plcClient != null)
             {

@@ -13,14 +13,14 @@ namespace FirstWeigh.Models
         public string OperatorName { get; set; } = string.Empty;
         public DateTime? PlannedStartTime { get; set; } //added as of 20251029
         public DateTime? PlannedEndTime { get; set; } //added as of 20251029
-        public decimal CompliancePercentage => TotalIngredientsWeighed > 0? (decimal)IngredientsWithinTolerance / TotalIngredientsWeighed * 100: 0;
+        public decimal CompliancePercentage => TotalIngredientsWeighed > 0 ? (decimal)IngredientsWithinTolerance / TotalIngredientsWeighed * 100 : 0;
 
-        public TimeSpan Duration => SessionEndTime.HasValue? SessionEndTime.Value - SessionStartTime: TimeSpan.Zero;
+        public TimeSpan Duration => SessionEndTime.HasValue ? SessionEndTime.Value - SessionStartTime : TimeSpan.Zero;
 
         // Session timing
         public DateTime SessionStartTime { get; set; }
         public DateTime? SessionEndTime { get; set; }
-      
+
         // Batch details
         public int TotalRepetitions { get; set; }
         public int CompletedRepetitions { get; set; }

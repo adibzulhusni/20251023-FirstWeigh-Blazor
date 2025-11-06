@@ -6,6 +6,7 @@
 @inject IngredientService IngredientService
 @inject AuthenticationService AuthService
 @inject NavigationManager Navigation
+@inject BowlService BowlService
 @implements IDisposable
 
 <style>
@@ -572,7 +573,8 @@
             totalIngredientsCount = allIngredients.Count;
 
             // TODO: Load bowl statistics when bowl service is ready
-            availableBowlsCount = 0; // Placeholder
+            var allBowls = await BowlService.GetAllBowlsAsync();
+            availableBowlsCount = allBowls.Count(b => b.Status == BowlStatus.Available);
         }
         catch (Exception ex)
         {
