@@ -133,9 +133,13 @@ namespace FirstWeigh.Services
             worksheet.Cell(1, 18).Value = "ScaleNumber";
             worksheet.Cell(1, 19).Value = "Unit";
             worksheet.Cell(1, 20).Value = "Timestamp";
+            // ✅ NEW COLUMNS FOR SCALE 2 TRACKING
+            worksheet.Cell(1, 21).Value = "Scale2WeightBefore";
+            worksheet.Cell(1, 22).Value = "Scale2WeightAfter";
+            worksheet.Cell(1, 23).Value = "TransferDeviation";
 
             // Style headers
-            var headerRange = worksheet.Range(1, 1, 1, 20);
+            var headerRange = worksheet.Range(1, 1, 1, 23);
             headerRange.Style.Font.Bold = true;
             headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
 
@@ -441,7 +445,8 @@ namespace FirstWeigh.Services
             row++;
 
             // Headers
-            var headers = new[] { "Rep", "Seq", "Ing Code", "Ingredient", "Target (kg)", "Actual (kg)", "Deviation (kg)", "Min (kg)", "Max (kg)", "Status", "Bowl", "Time" };
+            // Headers
+            var headers = new[] { "Rep", "Seq", "Ing Code", "Ingredient", "Target (kg)", "Actual (kg)", "Deviation (kg)", "Min (kg)", "Max (kg)", "Status", "Scale 2 Before", "Scale 2 After", "Cumulative", "Transfer Check", "Bowl", "Time" };
             for (int col = 0; col < headers.Length; col++)
             {
                 worksheet.Cell(row, col + 1).Value = headers[col];
@@ -463,8 +468,14 @@ namespace FirstWeigh.Services
                 worksheet.Cell(row, 8).Value = detail.MinWeight;
                 worksheet.Cell(row, 9).Value = detail.MaxWeight;
                 worksheet.Cell(row, 10).Value = detail.IsWithinTolerance ? "OK" : "OUT";
-                worksheet.Cell(row, 11).Value = detail.BowlCode;
-                worksheet.Cell(row, 12).Value = detail.Timestamp.ToString("HH:mm:ss");
+                // ✅ NEW: Scale 2 columns (11-14)
+                worksheet.Cell(row, 11).Value = detail.Scale2WeightBefore;
+                worksheet.Cell(row, 12).Value = detail.Scale2WeightAfter;
+                worksheet.Cell(row, 13).Value = detail.Scale2WeightAfter; // Cumulative
+                worksheet.Cell(row, 14).Value = detail.TransferDeviation;
+                // ✅ Shifted: BowlCode and Timestamp move to 15-16
+                worksheet.Cell(row, 15).Value = detail.BowlCode;
+                worksheet.Cell(row, 16).Value = detail.Timestamp.ToString("HH:mm:ss");
 
                 // Color code the status
                 if (detail.IsWithinTolerance)
@@ -528,6 +539,10 @@ namespace FirstWeigh.Services
                 worksheet.Cell(newRow, 18).Value = detail.ScaleNumber;
                 worksheet.Cell(newRow, 19).Value = detail.Unit;
                 worksheet.Cell(newRow, 20).Value = detail.Timestamp;
+                // ✅ NEW: Scale 2 tracking
+                worksheet.Cell(newRow, 21).Value = detail.Scale2WeightBefore;
+                worksheet.Cell(newRow, 22).Value = detail.Scale2WeightAfter;
+                worksheet.Cell(newRow, 23).Value = detail.TransferDeviation;
 
                 workbook.Save();
                 Console.WriteLine($"✅ Saved ingredient detail: {detail.IngredientCode} for {recordId}");
@@ -902,7 +917,11 @@ namespace FirstWeigh.Services
                 BowlType = row.Cell(17).GetString(),
                 ScaleNumber = ParseInt(row.Cell(18)),               // ✅ Safe parsing
                 Unit = row.Cell(19).GetString(),
-                Timestamp = ParseDateTime(row.Cell(20))             // ✅ Safe parsing
+                Timestamp = ParseDateTime(row.Cell(20)),             // ✅ Safe parsing
+                 // ✅ NEW: Scale 2 tracking
+                Scale2WeightBefore = ParseDecimal(row.Cell(21)),
+                Scale2WeightAfter = ParseDecimal(row.Cell(22)),
+                TransferDeviation = ParseDecimal(row.Cell(23))
             };
         }
         public async Task CompleteWeighingRecordAsync(string recordId, int completedRepetitions)
@@ -1064,7 +1083,11 @@ namespace FirstWeigh.Services
                                         BowlType = row.Cell(17).GetString(),              // ✅ FIXED!
                                         ScaleNumber = ParseInt(row.Cell(18)),             // ✅ FIXED!
                                         Unit = row.Cell(19).GetString(),                  // ✅ FIXED!
-                                        Timestamp = ParseDateTime(row.Cell(20))           // ✅ FIXED!
+                                        Timestamp = ParseDateTime(row.Cell(20)),       // ✅ FIXED!
+                                        // ✅ NEW: Read Scale 2 tracking data
+                                        Scale2WeightBefore = ParseDecimal(row.Cell(21)),
+                                        Scale2WeightAfter = ParseDecimal(row.Cell(22)),
+                                        TransferDeviation = ParseDecimal(row.Cell(23))
                                     });
                                 }
                             }
@@ -1171,6 +1194,10 @@ namespace FirstWeigh.Services
                         worksheet.Cell(newRow, 18).Value = detail.ScaleNumber;                // ✅ ScaleNumber
                         worksheet.Cell(newRow, 19).Value = detail.Unit;                       // ✅ Unit
                         worksheet.Cell(newRow, 20).Value = detail.Timestamp;                  // ✅ Timestamp
+                                                                                              // ✅ NEW: Save Scale 2 tracking data
+                        worksheet.Cell(newRow, 21).Value = (double)detail.Scale2WeightBefore;
+                        worksheet.Cell(newRow, 22).Value = (double)detail.Scale2WeightAfter;
+                        worksheet.Cell(newRow, 23).Value = (double)detail.TransferDeviation;
 
                         workbook.Save();
                         return true;
@@ -1282,6 +1309,216 @@ namespace FirstWeigh.Services
             if (cell.TryGetValue(out DateTime dateValue)) return dateValue;
             if (DateTime.TryParse(cell.GetString(), out DateTime result)) return result;
             return null;
+        }
+        public async Task<byte[]> ExportBulkReportsToExcelAsync(List<WeighingRecord> records)
+        {
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Batch Reports");
+
+            // ✅ HEADERS (Row 1)
+            int col = 1;
+
+            // Record Information
+            worksheet.Cell(1, col++).Value = "Record ID";
+            worksheet.Cell(1, col++).Value = "Batch ID";
+            worksheet.Cell(1, col++).Value = "Recipe";
+            worksheet.Cell(1, col++).Value = "Recipe Code";
+            worksheet.Cell(1, col++).Value = "Operator";
+
+            // Timing
+            worksheet.Cell(1, col++).Value = "Planned Start";
+            worksheet.Cell(1, col++).Value = "Planned End";
+            worksheet.Cell(1, col++).Value = "Start Time";
+            worksheet.Cell(1, col++).Value = "End Time";
+            worksheet.Cell(1, col++).Value = "Duration";
+
+            // Status
+            worksheet.Cell(1, col++).Value = "Report Status";
+            worksheet.Cell(1, col++).Value = "Abort Reason";
+            worksheet.Cell(1, col++).Value = "Aborted By";
+            worksheet.Cell(1, col++).Value = "Aborted Date";
+
+            // Report Metrics
+            worksheet.Cell(1, col++).Value = "Total Reps";
+            worksheet.Cell(1, col++).Value = "Completed Reps";
+            worksheet.Cell(1, col++).Value = "Total Ingredients";
+            worksheet.Cell(1, col++).Value = "Within Tolerance";
+            worksheet.Cell(1, col++).Value = "Out of Tolerance";
+            worksheet.Cell(1, col++).Value = "Compliance %";
+            worksheet.Cell(1, col++).Value = "Avg Deviation (kg)";
+            worksheet.Cell(1, col++).Value = "Max Deviation (kg)";
+
+            // Detail Information
+            worksheet.Cell(1, col++).Value = "Rep #";
+            worksheet.Cell(1, col++).Value = "Seq";
+            worksheet.Cell(1, col++).Value = "Ingredient ID";
+            worksheet.Cell(1, col++).Value = "Ingredient Code";
+            worksheet.Cell(1, col++).Value = "Ingredient Name";
+
+            // Weighing Data
+            worksheet.Cell(1, col++).Value = "Target (kg)";
+            worksheet.Cell(1, col++).Value = "Actual (kg)";
+            worksheet.Cell(1, col++).Value = "Deviation (kg)";
+            worksheet.Cell(1, col++).Value = "Min (kg)";
+            worksheet.Cell(1, col++).Value = "Max (kg)";
+            worksheet.Cell(1, col++).Value = "Tolerance (kg)";
+            worksheet.Cell(1, col++).Value = "Ingredient Status";
+
+            // Scale 2 Tracking
+            worksheet.Cell(1, col++).Value = "Scale 2 Before (kg)";
+            worksheet.Cell(1, col++).Value = "Scale 2 After (kg)";
+            worksheet.Cell(1, col++).Value = "Cumulative (kg)";
+            worksheet.Cell(1, col++).Value = "Transfer Check (kg)";
+
+            // Equipment
+            worksheet.Cell(1, col++).Value = "Bowl Code";
+            worksheet.Cell(1, col++).Value = "Bowl Type";
+            worksheet.Cell(1, col++).Value = "Scale Number";
+            worksheet.Cell(1, col++).Value = "Unit";
+
+            // Timestamp
+            worksheet.Cell(1, col++).Value = "Weighing Time";
+
+            // Style headers
+            var headerRange = worksheet.Range(1, 1, 1, col - 1);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(74, 158, 255); // #4a9eff
+            headerRange.Style.Font.FontColor = XLColor.White;
+            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // ✅ DATA ROWS
+            int row = 2;
+            foreach (var record in records.OrderBy(r => r.SessionStartTime))
+            {
+                // Get all details for this record
+                var details = await GetDetailsByRecordIdAsync(record.RecordId);
+
+                if (!details.Any())
+                {
+                    // If no details, still show the record with empty ingredient columns
+                    col = 1;
+
+                    // Record info
+                    worksheet.Cell(row, col++).Value = record.RecordId;
+                    worksheet.Cell(row, col++).Value = record.BatchId;
+                    worksheet.Cell(row, col++).Value = record.RecipeName;
+                    worksheet.Cell(row, col++).Value = record.RecipeCode;
+                    worksheet.Cell(row, col++).Value = record.OperatorName;
+
+                    // Timing
+                    worksheet.Cell(row, col++).Value = record.PlannedStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                    worksheet.Cell(row, col++).Value = record.PlannedEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                    worksheet.Cell(row, col++).Value = record.SessionStartTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    worksheet.Cell(row, col++).Value = record.SessionEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                    worksheet.Cell(row, col++).Value = FormatDuration(record.Duration);
+
+                    // Status
+                    worksheet.Cell(row, col++).Value = record.Status;
+                    worksheet.Cell(row, col++).Value = record.AbortReason ?? "";
+                    worksheet.Cell(row, col++).Value = record.AbortedBy ?? "";
+                    worksheet.Cell(row, col++).Value = record.AbortedDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+
+                    // Metrics
+                    worksheet.Cell(row, col++).Value = record.TotalRepetitions;
+                    worksheet.Cell(row, col++).Value = record.CompletedRepetitions;
+                    worksheet.Cell(row, col++).Value = record.TotalIngredientsWeighed;
+                    worksheet.Cell(row, col++).Value = record.IngredientsWithinTolerance;
+                    worksheet.Cell(row, col++).Value = record.IngredientsOutOfTolerance;
+                    worksheet.Cell(row, col++).Value = record.CompliancePercentage;
+                    worksheet.Cell(row, col++).Value = record.AverageDeviation;
+                    worksheet.Cell(row, col++).Value = record.MaxDeviation;
+
+                    row++;
+                }
+                else
+                {
+                    // For each detail, create a row with full record context
+                    foreach (var detail in details.OrderBy(d => d.RepetitionNumber).ThenBy(d => d.IngredientSequence))
+                    {
+                        col = 1;
+
+                        // Record info (repeated for each ingredient)
+                        worksheet.Cell(row, col++).Value = record.RecordId;
+                        worksheet.Cell(row, col++).Value = record.BatchId;
+                        worksheet.Cell(row, col++).Value = record.RecipeName;
+                        worksheet.Cell(row, col++).Value = record.RecipeCode;
+                        worksheet.Cell(row, col++).Value = record.OperatorName;
+
+                        // Timing
+                        worksheet.Cell(row, col++).Value = record.PlannedStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                        worksheet.Cell(row, col++).Value = record.PlannedEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                        worksheet.Cell(row, col++).Value = record.SessionStartTime.ToString("yyyy-MM-dd HH:mm:ss");
+                        worksheet.Cell(row, col++).Value = record.SessionEndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                        worksheet.Cell(row, col++).Value = FormatDuration(record.Duration);
+
+                        // Status
+                        worksheet.Cell(row, col++).Value = record.Status;
+                        worksheet.Cell(row, col++).Value = record.AbortReason ?? "";
+                        worksheet.Cell(row, col++).Value = record.AbortedBy ?? "";
+                        worksheet.Cell(row, col++).Value = record.AbortedDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+
+                        // Metrics
+                        worksheet.Cell(row, col++).Value = record.TotalRepetitions;
+                        worksheet.Cell(row, col++).Value = record.CompletedRepetitions;
+                        worksheet.Cell(row, col++).Value = record.TotalIngredientsWeighed;
+                        worksheet.Cell(row, col++).Value = record.IngredientsWithinTolerance;
+                        worksheet.Cell(row, col++).Value = record.IngredientsOutOfTolerance;
+                        worksheet.Cell(row, col++).Value = record.CompliancePercentage;
+                        worksheet.Cell(row, col++).Value = record.AverageDeviation;
+                        worksheet.Cell(row, col++).Value = record.MaxDeviation;
+
+                        // Detail information
+                        worksheet.Cell(row, col++).Value = detail.RepetitionNumber;
+                        worksheet.Cell(row, col++).Value = detail.IngredientSequence;
+                        worksheet.Cell(row, col++).Value = detail.IngredientId;
+                        worksheet.Cell(row, col++).Value = detail.IngredientCode;
+                        worksheet.Cell(row, col++).Value = detail.IngredientName;
+
+                        // Weighing data
+                        worksheet.Cell(row, col++).Value = detail.TargetWeight;
+                        worksheet.Cell(row, col++).Value = detail.ActualWeight;
+                        worksheet.Cell(row, col++).Value = detail.Deviation;
+                        worksheet.Cell(row, col++).Value = detail.MinWeight;
+                        worksheet.Cell(row, col++).Value = detail.MaxWeight;
+                        worksheet.Cell(row, col++).Value = detail.ToleranceValue;
+                        worksheet.Cell(row, col++).Value = detail.IsWithinTolerance ? "OK" : "OUT";
+
+                        // Scale 2 tracking
+                        worksheet.Cell(row, col++).Value = detail.Scale2WeightBefore;
+                        worksheet.Cell(row, col++).Value = detail.Scale2WeightAfter;
+                        worksheet.Cell(row, col++).Value = detail.Scale2WeightAfter; // Cumulative
+                        worksheet.Cell(row, col++).Value = detail.TransferDeviation;
+
+                        // Equipment
+                        worksheet.Cell(row, col++).Value = detail.BowlCode;
+                        worksheet.Cell(row, col++).Value = detail.BowlType;
+                        worksheet.Cell(row, col++).Value = detail.ScaleNumber;
+                        worksheet.Cell(row, col++).Value = detail.Unit;
+
+                        // Timestamp
+                        worksheet.Cell(row, col++).Value = detail.Timestamp.ToString("yyyy-MM-dd HH:mm:ss");
+
+                        // Color code the ingredient status
+                        if (detail.IsWithinTolerance)
+                            worksheet.Cell(row, 33).Style.Fill.BackgroundColor = XLColor.LightGreen; // Column 33 = "Ingredient Status"
+                        else
+                            worksheet.Cell(row, 33).Style.Fill.BackgroundColor = XLColor.LightPink;
+
+                        row++;
+                    }
+                }
+            }
+
+            // Auto-fit columns
+            worksheet.Columns().AdjustToContents();
+
+            // Freeze header row
+            worksheet.SheetView.FreezeRows(1);
+
+            // Convert to byte array
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
         }
     }
 }

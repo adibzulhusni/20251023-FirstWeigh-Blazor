@@ -651,7 +651,11 @@ namespace FirstWeigh.Services
                 BowlType = transfer.BowlType,
                 ScaleNumber = 1,
                 Unit = "kg",
-                Timestamp = transfer.TransferredAt
+                Timestamp = transfer.TransferredAt,
+                // ✅ NEW: Add Scale 2 tracking data
+                Scale2WeightBefore = transfer.Scale2WeightBefore,
+                Scale2WeightAfter = transfer.Scale2WeightAfter,
+                TransferDeviation = transfer.TransferDeviation
             };
 
             await _reportService.SaveWeighingDetailAsync(detail);

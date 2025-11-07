@@ -7,10 +7,12 @@ namespace FirstWeigh.Services
     {
         private readonly string _filePath = "Data/Batches.xlsx";
         private readonly RecipeService _recipeService;
+        private readonly ReportService _reportService;  // ✅ ADD THIS
 
-        public BatchService(RecipeService recipeService)
+        public BatchService(RecipeService recipeService,ReportService reportService)  // ✅ ADD THIS PARAMETER
         {
             _recipeService = recipeService;
+            _reportService = reportService;  // ✅ ADD THIS
             EnsureFileExists();
         }
 
@@ -355,7 +357,7 @@ namespace FirstWeigh.Services
 
         public async Task<bool> AbortBatchAsync(string batchId, string abortedBy, string abortReason)
         {
-            // ✅ ADD VALIDATION
+            // ✅ VALIDATION
             if (string.IsNullOrWhiteSpace(abortReason))
             {
                 Console.WriteLine("❌ ERROR: Abort reason cannot be empty!");
@@ -368,11 +370,53 @@ namespace FirstWeigh.Services
             batch.Status = "Aborted";
             batch.AbortedBy = abortedBy;
             batch.AbortedDate = DateTime.Now;
-            batch.AbortReason = abortReason;  // ✅ This is set
+            batch.AbortReason = abortReason;
 
             Console.WriteLine($"🚫 Batch {batchId} aborted by {abortedBy}. Reason: {abortReason}");
 
-            return await UpdateBatchAsync(batch);
+            var result = await UpdateBatchAsync(batch);
+
+            // ✅ NEW: Update associated WeighingRecord
+            if (result)
+            {
+                await UpdateAssociatedWeighingRecordAsync(batchId, abortedBy, abortReason);
+            }
+
+            return result;
+        }
+
+        // ✅ NEW: Helper method to update WeighingRecord when batch is aborted
+        private async Task UpdateAssociatedWeighingRecordAsync(string batchId, string abortedBy, string reason)
+        {
+            try
+            {
+                // Find the WeighingRecord for this batch that's InProgress
+                var allRecords = await _reportService.GetAllWeighingRecordsAsync();
+                var record = allRecords.FirstOrDefault(r =>
+                    r.BatchId == batchId &&
+                    r.Status == WeighingRecordStatus.InProgress);
+
+                if (record != null)
+                {
+                    // Update to Aborted
+                    record.Status = WeighingRecordStatus.Aborted;
+                    record.AbortReason = reason;
+                    record.AbortedBy = abortedBy;
+                    record.AbortedDate = DateTime.Now;
+                    record.SessionEndTime = DateTime.Now;
+
+                    await _reportService.UpdateWeighingRecordAsync(record);
+                    Console.WriteLine($"✅ WeighingRecord {record.RecordId} updated to Aborted");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ No InProgress WeighingRecord found for batch {batchId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error updating WeighingRecord: {ex.Message}");
+            }
         }
 
         public async Task<bool> UpdateRepetitionProgressAsync(string batchId, int currentRepetition)

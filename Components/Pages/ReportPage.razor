@@ -1,5 +1,4 @@
-﻿// ReportsPage.razor
-
+﻿
 @page "/reports"
 @using FirstWeigh.Models
 @using FirstWeigh.Services
@@ -98,6 +97,28 @@
         font-weight: 600;
         cursor: pointer;
     }
+
+    .btn-export-all {
+        background-color: #48bb78;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-export-all:hover:not(:disabled) {
+            background-color: #38a169;
+        }
+
+        .btn-export-all:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
 
     .stats-row {
         display: grid;
@@ -335,6 +356,10 @@
             <button class="btn-clear" @onclick="ClearFilters">
                 Clear
             </button>
+            <!-- ✅ NEW: Export All Button -->
+            <button class="btn-export-all" @onclick="ExportAllToExcel" disabled="@(!filteredReports.Any())">
+                📥 Export All to Excel
+            </button>
         </div>
     </div>
 
@@ -554,5 +579,25 @@
         if (duration.TotalHours >= 1)
             return $"{duration.Hours}h {duration.Minutes}m";
         return $"{duration.Minutes}m";
+    }
+    private async Task ExportAllToExcel()
+    {
+        if (!filteredReports.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "No reports to export!");
+            return;
+        }
+
+        try
+        {
+            var excelBytes = await ReportService.ExportBulkReportsToExcelAsync(filteredReports);
+            var fileName = $"BatchReports_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(excelBytes));
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error exporting to Excel: {ex.Message}");
+        }
     }
 }

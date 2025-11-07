@@ -85,6 +85,11 @@ namespace FirstWeigh.Models
         // Timing
         public DateTime Timestamp { get; set; } = DateTime.Now;
 
+        // ✅ NEW: Scale 2 (Mixing Bowl) tracking
+        public decimal Scale2WeightBefore { get; set; }
+        public decimal Scale2WeightAfter { get; set; }
+        public decimal TransferDeviation { get; set; }
+
         // Computed properties for display
         public string StatusIcon => IsWithinTolerance ? "✓" : "⚠";
         public string StatusColor => IsWithinTolerance ? "green" : "orange";
