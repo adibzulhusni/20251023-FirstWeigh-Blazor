@@ -1,4 +1,7 @@
-﻿using FirstWeigh.Models;
+﻿using DocumentFormat.OpenXml.Drawing.Charts;
+using DocumentFormat.OpenXml.Presentation;
+using FirstWeigh.Models;
+using Microsoft.AspNetCore.Components;
 using System.Timers;
 
 namespace FirstWeigh.Services
@@ -10,10 +13,10 @@ namespace FirstWeigh.Services
         private CurrentUserInfo? _currentUser;
         private System.Timers.Timer? _sessionTimer;
         private const string SESSION_KEY = "FirstWeigh_Session";
-        private const int SESSION_TIMEOUT_MINUTES = 5;
+        private const int SESSION_TIMEOUT_MINUTES = 1;
         private readonly LoginAttemptService _loginAttemptService;
         private readonly AuditLogService _auditLogService;
-
+        private readonly NavigationManager _navigationManager;
         public event Action<CurrentUserInfo?>? OnAuthenticationStateChanged;
 
         public CurrentUserInfo? CurrentUser => _currentUser;
@@ -21,12 +24,13 @@ namespace FirstWeigh.Services
 
 
 
-        public AuthenticationService(UserService userService, BrowserStorageService storageService,LoginAttemptService loginAttemptService, AuditLogService auditLogService)
+        public AuthenticationService(UserService userService, BrowserStorageService storageService,LoginAttemptService loginAttemptService, AuditLogService auditLogService, NavigationManager navigationManager)
         {
             _userService = userService;
             _storageService = storageService;
             _loginAttemptService = loginAttemptService;
             _auditLogService = auditLogService;
+            _navigationManager = navigationManager;  // ADD THIS
         }
 
         public async Task<bool> LoginAsync(string username, string password, bool rememberMe = false)
@@ -68,6 +72,9 @@ namespace FirstWeigh.Services
             await _storageService.RemoveItemAsync(SESSION_KEY);
 
             OnAuthenticationStateChanged?.Invoke(null);
+
+            // Force page reload to login - ADD THIS
+            _navigationManager.NavigateTo("/login", forceLoad: true);
         }
 
         public async Task<bool> RestoreSessionAsync()
@@ -130,29 +137,59 @@ namespace FirstWeigh.Services
 
         private async void OnSessionTimerElapsed(object? sender, ElapsedEventArgs e)
         {
-            var lastActivityTime = await _storageService.GetLastActivityTimeAsync();
-
-            if (lastActivityTime.HasValue)
+            try
             {
-                var timeSinceActivity = DateTime.Now - lastActivityTime.Value;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⏰ Session timer tick");
 
-                if (timeSinceActivity.TotalMinutes > SESSION_TIMEOUT_MINUTES)
+                var lastActivityTime = await _storageService.GetLastActivityTimeAsync();
+
+                if (lastActivityTime.HasValue)
                 {
-                    // Session timed out
-                    await LogoutAsync();
+                    var timeSinceActivity = DateTime.Now - lastActivityTime.Value;
+
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Last activity: {lastActivityTime.Value:g}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Time since activity: {timeSinceActivity.TotalMinutes:F2} minutes");
+
+                    if (timeSinceActivity.TotalMinutes > SESSION_TIMEOUT_MINUTES)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ SESSION TIMEOUT - Logging out!");
+
+                        // Stop timer first to prevent multiple logout calls
+                        StopSessionTimer();
+
+                        // Logout on UI thread
+                        await InvokeAsync(async () => await LogoutAsync());
+                    }
+                    else
+                    {
+                        // Update session data with current activity time
+                        var sessionData = await _storageService.GetItemAsync<SessionData>(SESSION_KEY);
+                        if (sessionData != null)
+                        {
+                            sessionData.LastActivityTime = lastActivityTime.Value;
+                            await _storageService.SetItemAsync(SESSION_KEY, sessionData);
+
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ✅ Session updated - {SESSION_TIMEOUT_MINUTES - timeSinceActivity.TotalMinutes:F1} minutes remaining");
+                        }
+                    }
                 }
                 else
                 {
-                    // Update session data with current activity time
-                    var sessionData = await _storageService.GetItemAsync<SessionData>(SESSION_KEY);
-                    if (sessionData != null)
-                    {
-                        sessionData.LastActivityTime = lastActivityTime.Value;
-                        await _storageService.SetItemAsync(SESSION_KEY, sessionData);
-                    }
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ No activity time found");
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ❌ Timer error: {ex.Message}");
+            }
         }
+
+        // Add this helper method for UI thread invocation
+        private Task InvokeAsync(Func<Task> action)
+        {
+            return Task.Run(action);
+        }
+
 
         public UserPermissions GetCurrentUserPermissions()
         {

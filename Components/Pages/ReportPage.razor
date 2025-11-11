@@ -315,6 +315,227 @@
         padding: 40px;
         color: #718096;
     }
+    /* Ingredient Usage Button */
+    .btn-view-usage {
+        background-color: #4a9eff;
+        color: white;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .btn-view-usage:hover {
+            background-color: #3a8ee6;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+        }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+    }
+
+    .modal-container {
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 1200px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @@keyframes modalSlideIn {
+        from
+
+    {
+        opacity: 0;
+        transform: scale(0.95) translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+
+    }
+
+    .modal-header {
+        padding: 24px 32px;
+        border-bottom: 2px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1a202c;
+    }
+
+    .modal-subtitle {
+        font-size: 14px;
+        color: #718096;
+        margin-top: 4px;
+    }
+
+    .btn-close-modal {
+        background: #f7fafc;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 24px;
+        color: #718096;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .btn-close-modal:hover {
+            background-color: #edf2f7;
+            color: #2d3748;
+        }
+
+    .modal-body {
+        padding: 24px 32px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .modal-actions {
+        padding: 16px 32px;
+        border-top: 2px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .btn-export-usage {
+        background-color: #48bb78;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+        .btn-export-usage:hover {
+            background-color: #38a169;
+        }
+
+    /* Usage Table Styles */
+    .usage-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .usage-table thead {
+            background-color: #f7fafc;
+            border-bottom: 2px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .usage-table th {
+            padding: 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #2d3748;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+            .usage-table th:hover {
+                background-color: #edf2f7;
+            }
+
+            .usage-table th.sortable::after {
+                content: ' ↕';
+                color: #cbd5e0;
+                font-size: 12px;
+            }
+
+            .usage-table th.sorted-asc::after {
+                content: ' ↑';
+                color: #4a9eff;
+            }
+
+            .usage-table th.sorted-desc::after {
+                content: ' ↓';
+                color: #4a9eff;
+            }
+
+        .usage-table tbody tr {
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.15s;
+        }
+
+            .usage-table tbody tr:hover {
+                background-color: #f7fafc;
+            }
+
+        .usage-table td {
+            padding: 16px;
+            font-size: 14px;
+            color: #2d3748;
+        }
+
+    .usage-code {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        color: #4a9eff;
+    }
+
+    .usage-weight {
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        color: #2d3748;
+    }
+
+    .usage-count {
+        display: inline-block;
+        background-color: #edf2f7;
+        color: #2d3748;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .usage-stats {
+        color: #718096;
+        font-size: 14px;
+        font-weight: 600;
+    }
 </style>
 
 <div class="reports-container">
@@ -322,6 +543,85 @@
     <div class="page-header">
         <h1 class="page-title">📊 Weighing Reports</h1>
         <p class="page-subtitle">View and analyze completed batch reports</p>
+        <!-- Ingredient Usage Button (instead of showing the table) -->
+     
+
+        <!-- Ingredient Usage Modal -->
+        @if (showUsageModal)
+        {
+            <div class="modal-overlay" @onclick="CloseUsageModal">
+                <div class="modal-container" @onclick:stopPropagation="true">
+                    <!-- Modal Header -->
+                    <div class="modal-header">
+                        <div>
+                            <h2 class="modal-title">📦 Ingredient Usage Summary</h2>
+                            <p class="modal-subtitle">Total consumption across all weighing records</p>
+                        </div>
+                        <button class="btn-close-modal" @onclick="CloseUsageModal">×</button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="modal-body">
+                        @if (isLoadingUsage)
+                        {
+                            <div class="loading">
+                                <p>⏳ Loading ingredient usage...</p>
+                            </div>
+                        }
+                        else if (!ingredientUsage.Any())
+                        {
+                            <div class="empty-state">
+                                <div class="empty-icon">📦</div>
+                                <div class="empty-text">No Ingredient Usage Data</div>
+                                <div class="empty-subtext">Start weighing to track ingredient consumption</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <table class="usage-table">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable @GetSortClass("IngredientCode")" @onclick='() => SortUsage("IngredientCode")'>
+                                            Ingredient Code
+                                        </th>
+                                        <th class="sortable @GetSortClass("IngredientName")" @onclick='() => SortUsage("IngredientName")'>
+                                            Ingredient Name
+                                        </th>
+                                        <th class="sortable @GetSortClass("TotalWeightUsed")" @onclick='() => SortUsage("TotalWeightUsed")'>
+                                            Total Weight Used (kg)
+                                        </th>
+                                        <th class="sortable @GetSortClass("TimesUsed")" @onclick='() => SortUsage("TimesUsed")'>
+                                            Times Used
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in ingredientUsage)
+                                    {
+                                        <tr>
+                                            <td><span class="usage-code">@item.IngredientCode</span></td>
+                                            <td>@item.IngredientName</td>
+                                            <td><span class="usage-weight">@item.TotalWeightUsed.ToString("F2")</span></td>
+                                            <td><span class="usage-count">@item.TimesUsed</span></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="modal-actions">
+                        <div class="usage-stats">
+                            @ingredientUsage.Count ingredients tracked
+                        </div>
+                        <button class="btn-export-usage" @onclick="ExportIngredientUsageToExcel" disabled="@(!ingredientUsage.Any())">
+                            📥 Export to Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 
     <!-- Filters Card -->
@@ -359,6 +659,10 @@
             <!-- ✅ NEW: Export All Button -->
             <button class="btn-export-all" @onclick="ExportAllToExcel" disabled="@(!filteredReports.Any())">
                 📥 Export All to Excel
+            </button>
+            <!-- ✅ NEW: Add Ingredient Usage button here -->
+            <button class="btn-view-usage" @onclick="OpenIngredientUsageModal">
+                📦 Ingredient Usage
             </button>
         </div>
     </div>
@@ -475,6 +779,13 @@
     private DateTime endDate = DateTime.Today;
     private string statusFilter = "";
     private string searchText = "";
+    // Ingredient Usage Variables
+    private List<IngredientUsageSummary> ingredientUsage = new();
+    private bool isLoadingUsage = false;
+    private string usageSortColumn = "IngredientCode";
+    private bool usageSortAscending = true;
+    // Add this variable with the other ingredient usage variables
+    private bool showUsageModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -599,5 +910,113 @@
         {
             await JSRuntime.InvokeVoidAsync("alert", $"Error exporting to Excel: {ex.Message}");
         }
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadIngredientUsage();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadIngredientUsage()
+    {
+        isLoadingUsage = true;
+        StateHasChanged();
+
+        try
+        {
+            ingredientUsage = await ReportService.GetIngredientUsageSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading ingredient usage: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingUsage = false;
+        }
+    }
+
+    private void SortUsage(string column)
+    {
+        if (usageSortColumn == column)
+        {
+            // Toggle sort direction
+            usageSortAscending = !usageSortAscending;
+        }
+        else
+        {
+            // New column, default to ascending
+            usageSortColumn = column;
+            usageSortAscending = true;
+        }
+
+        // Apply sort
+        ingredientUsage = column switch
+        {
+            "IngredientCode" => usageSortAscending
+                ? ingredientUsage.OrderBy(i => i.IngredientCode).ToList()
+                : ingredientUsage.OrderByDescending(i => i.IngredientCode).ToList(),
+            "IngredientName" => usageSortAscending
+                ? ingredientUsage.OrderBy(i => i.IngredientName).ToList()
+                : ingredientUsage.OrderByDescending(i => i.IngredientName).ToList(),
+            "TotalWeightUsed" => usageSortAscending
+                ? ingredientUsage.OrderBy(i => i.TotalWeightUsed).ToList()
+                : ingredientUsage.OrderByDescending(i => i.TotalWeightUsed).ToList(),
+            "TimesUsed" => usageSortAscending
+                ? ingredientUsage.OrderBy(i => i.TimesUsed).ToList()
+                : ingredientUsage.OrderByDescending(i => i.TimesUsed).ToList(),
+            _ => ingredientUsage
+        };
+    }
+
+    private string GetSortClass(string column)
+    {
+        if (usageSortColumn != column)
+            return "";
+
+        return usageSortAscending ? "sorted-asc" : "sorted-desc";
+    }
+
+    private async Task ExportIngredientUsageToExcel()
+    {
+        if (!ingredientUsage.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "No ingredient usage data to export!");
+            return;
+        }
+
+        try
+        {
+            var excelBytes = await ReportService.ExportIngredientUsageToExcelAsync();
+            var fileName = $"IngredientUsage_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(excelBytes));
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error exporting to Excel: {ex.Message}");
+        }
+    }
+
+    // Add these two methods
+    private async Task OpenIngredientUsageModal()
+    {
+        showUsageModal = true;
+
+        // Load data if not already loaded
+        if (!ingredientUsage.Any() && !isLoadingUsage)
+        {
+            await LoadIngredientUsage();
+        }
+
+        StateHasChanged();
+    }
+
+    private void CloseUsageModal()
+    {
+        showUsageModal = false;
     }
 }

@@ -1520,5 +1520,98 @@ namespace FirstWeigh.Services
             workbook.SaveAs(stream);
             return stream.ToArray();
         }
+        // ✅ GET INGREDIENT USAGE SUMMARY
+        public async Task<List<IngredientUsageSummary>> GetIngredientUsageSummaryAsync()
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                var usageDict = new Dictionary<string, IngredientUsageSummary>();
+
+                using var workbook = new XLWorkbook(_detailsFilePath);
+                var worksheet = workbook.Worksheet("WeighingDetails");
+                var rows = worksheet.RowsUsed().Skip(1); // Skip header
+
+                foreach (var row in rows)
+                {
+                    try
+                    {
+                        var ingredientCode = row.Cell(7).GetString();
+                        var ingredientName = row.Cell(8).GetString();
+                        var actualWeight = ParseDecimal(row.Cell(10));
+
+                        // Skip empty rows
+                        if (string.IsNullOrWhiteSpace(ingredientCode))
+                            continue;
+
+                        // Create or update ingredient summary
+                        if (!usageDict.ContainsKey(ingredientCode))
+                        {
+                            usageDict[ingredientCode] = new IngredientUsageSummary
+                            {
+                                IngredientCode = ingredientCode,
+                                IngredientName = ingredientName,
+                                TotalWeightUsed = 0,
+                                TimesUsed = 0
+                            };
+                        }
+
+                        usageDict[ingredientCode].TotalWeightUsed += actualWeight;
+                        usageDict[ingredientCode].TimesUsed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error reading detail row: {ex.Message}");
+                    }
+                }
+
+                return usageDict.Values.OrderBy(i => i.IngredientCode).ToList();
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
+        // ✅ EXPORT INGREDIENT USAGE TO EXCEL
+        public async Task<byte[]> ExportIngredientUsageToExcelAsync()
+        {
+            var usageSummary = await GetIngredientUsageSummaryAsync();
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Ingredient Usage");
+
+            // Headers
+            worksheet.Cell(1, 1).Value = "Ingredient Code";
+            worksheet.Cell(1, 2).Value = "Ingredient Name";
+            worksheet.Cell(1, 3).Value = "Total Weight Used (kg)";
+            worksheet.Cell(1, 4).Value = "Times Used";
+
+            // Style headers
+            var headerRange = worksheet.Range(1, 1, 1, 4);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#4a9eff");
+            headerRange.Style.Font.FontColor = XLColor.White;
+            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+            // Data
+            int row = 2;
+            foreach (var item in usageSummary)
+            {
+                worksheet.Cell(row, 1).Value = item.IngredientCode;
+                worksheet.Cell(row, 2).Value = item.IngredientName;
+                worksheet.Cell(row, 3).Value = item.TotalWeightUsed;
+                worksheet.Cell(row, 4).Value = item.TimesUsed;
+                row++;
+            }
+
+            // Auto-fit columns
+            worksheet.Columns().AdjustToContents();
+
+            // Convert to bytes
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }
     }
 }

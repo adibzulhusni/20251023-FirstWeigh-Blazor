@@ -1,5 +1,4 @@
-﻿window.browserStorage = {
-    lastActivityTime: new Date().toISOString(),
+﻿window.browserStorage = {lastActivityTime: new Date().toISOString(),
 
     getItem: function (key) {
         return localStorage.getItem(key);

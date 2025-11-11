@@ -278,11 +278,7 @@
             </div>
 
             <div class="form-options">
-                <div class="remember-me">
-                    <InputCheckbox id="remember" @bind-Value="loginModel.RememberMe" disabled="@isLoggingIn" />
-                    <label for="remember">Remember me</label>
-                </div>
-                <a href="#" class="forgot-password">Forgot password?</a>
+               
             </div>
 
             <button type="submit" class="btn-login" disabled="@isLoggingIn">
@@ -324,7 +320,7 @@
             var success = await AuthService.LoginAsync(
                 loginModel.Username,
                 loginModel.Password,
-                loginModel.RememberMe
+                false
             );
 
             if (success)
