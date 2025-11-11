@@ -8,49 +8,54 @@
 @implements IDisposable
 @inject ModbusScaleService ModbusService
 @inject BowlService BowlService
-@inject AuthenticationService AuthService  // ✅ ADD THIS
+@inject AuthenticationService AuthService
 
 <style>
-    /* Copy all your existing CSS styles here - they're fine */
+    /* ========== ULTRA COMPACT FOR ALL SCREENS ========== */
+    * {
+        box-sizing: border-box;
+    }
+
     .weighing-container {
         min-height: 100vh;
         background-color: #f5f7fa;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
 
+    /* ✅ HEADER - COMPACT WITH BIGGER BUTTONS */
     .weighing-header {
         background: white;
-        border-bottom: 2px solid #e2e8f0;
-        padding: 16px 32px;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 4px 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     .header-info {
         display: flex;
-        gap: 32px;
+        gap: 10px;
         align-items: center;
     }
 
     .info-item {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 1px;
     }
 
     .info-label {
-        font-size: 11px;
+        font-size: 8px;
         color: #718096;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
         font-weight: 600;
     }
 
     .info-value {
-        font-size: 16px;
+        font-size: 11px;
         color: #1a202c;
         font-weight: 600;
         font-family: 'Roboto Mono', monospace;
@@ -58,102 +63,92 @@
 
     .header-actions {
         display: flex;
-        gap: 12px;
+        gap: 8px;
+    }
+
+    /* ✅ BIGGER ACTION BUTTONS */
+    .btn-pause,
+    .btn-abort,
+    .btn-start-modbus,
+    .btn-stop-modbus {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        color: white;
+        min-height: 36px;
     }
 
     .btn-pause {
         background-color: #ed8936;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
     }
 
     .btn-abort {
         background-color: #f56565;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
     }
 
     .btn-start-modbus {
         background-color: #48bb78;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
     }
 
     .btn-stop-modbus {
         background-color: #718096;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
     }
 
+    /* CONTENT AREA */
     .weighing-content {
         flex: 1;
         display: flex;
         flex-direction: column;
-        padding: 32px;
-        gap: 24px;
-        max-width: 1400px;
-        margin: 0 auto;
+        padding: 5px;
+        gap: 5px;
         width: 100%;
+        overflow-y: auto;
+        max-height: calc(100vh - 40px);
+        scroll-behavior: smooth;
     }
 
+    /* STAGE INDICATOR */
     .stage-indicator {
         background: white;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-radius: 6px;
+        padding: 5px 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
 
     .stage-title {
-        font-size: 14px;
+        font-size: 9px;
         font-weight: 600;
         color: #718096;
-        margin-bottom: 12px;
+        margin-bottom: 3px;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.3px;
     }
 
     .stage-progress {
         display: flex;
-        gap: 16px;
+        gap: 5px;
         align-items: center;
     }
 
     .stage-step {
         flex: 1;
-        padding: 16px;
-        border-radius: 8px;
+        padding: 4px 6px;
+        border-radius: 4px;
         text-align: center;
         font-weight: 600;
         transition: all 0.3s;
-        border: 2px solid #e2e8f0;
+        border: 1px solid #e2e8f0;
+        font-size: 9px;
+        line-height: 1.2;
     }
 
         .stage-step.active {
             background: linear-gradient(135deg, #4a9eff, #3a8ee6);
             color: white;
             border-color: #4a9eff;
-            transform: scale(1.05);
         }
 
         .stage-step.completed {
@@ -167,33 +162,71 @@
             color: #a0aec0;
         }
 
+    /* ✅ SCALE CARDS - DYNAMIC SIZING */
     .scale-card {
         background: white;
-        border-radius: 12px;
-        padding: 32px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        flex: 1;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
         display: flex;
         flex-direction: column;
+        transition: all 0.3s ease;
+        scroll-margin-top: 50px;
     }
+
+        /* Scale 1 - FILLS ENTIRE SCREEN */
+        .scale-card.scale-1-active {
+            min-height: calc(100vh - 100px);
+            flex: 1;
+        }
+
+        /* Scale 2 - Compact when waiting */
+        .scale-card.scale-2-waiting {
+            flex: 1;
+            min-height: auto;
+            position: relative;
+        }
+
+        /* Scale 2 - Expanded during transfer */
+        .scale-card.scale-2-active {
+            min-height: 70vh;
+            flex: 4;
+        }
+
+        .scale-card.scale-2-waiting .scale-header::after {
+            content: "⬇️ Transfer section ready below";
+            display: block;
+            text-align: center;
+            font-size: 8px;
+            color: #4a9eff;
+            padding: 4px;
+            background: #e6f7ff;
+            border-radius: 4px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+
+        .scale-card.scale-2-active .scale-header::after {
+            display: none;
+        }
 
     .scale-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 24px;
-        padding-bottom: 16px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
         border-bottom: 2px solid #e2e8f0;
     }
 
     .scale-title-section {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
     }
 
     .scale-label {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 700;
         color: #4a9eff;
         text-transform: uppercase;
@@ -201,10 +234,12 @@
     }
 
     .scale-subtitle {
-        font-size: 13px;
+        font-size: 11px;
         color: #718096;
+        font-weight: 600;
     }
 
+    /* ✅ BIGGER INGREDIENT CODE */
     .ingredient-code {
         font-family: 'Roboto Mono', monospace;
         font-size: 24px;
@@ -216,85 +251,89 @@
         background-clip: text;
     }
 
+    /* ✅ BIGGER BOWL BADGES */
     .bowl-size-badge {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px 16px;
+        gap: 6px;
+        padding: 6px 14px;
         background: #e6f7ff;
         border: 2px solid #4a9eff;
-        border-radius: 20px;
-        font-weight: 600;
-        color: #2c5282;
-    }
-
-    .weight-display {
-        text-align: center;
-        margin: 32px 0;
-    }
-
-    .weight-value {
-        font-family: 'Roboto Mono', monospace;
-        font-size: 72px;
+        border-radius: 16px;
         font-weight: 700;
-        color: #1a202c;
+        color: #2c5282;
+        font-size: 12px;
+    }
+
+    /* ✅ MASSIVE PERCENTAGE DISPLAY - SHIFTED UP */
+    .percentage-display {
+        text-align: center;
+        margin: 0;
+        flex: 0.8;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px 0 10px 0;
+    }
+
+    ..percentage-value {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 120px !important;
+        font-weight: 700;
         line-height: 1;
         margin-bottom: 8px;
     }
 
-    .weight-unit {
-        font-size: 24px;
+    .percentage-label {
+        font-size: 16px;
         color: #718096;
-        font-weight: 600;
-    }
-
-    .weight-label {
-        font-size: 14px;
-        color: #718096;
-        margin-bottom: 8px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 2px;
+        margin-bottom: 5px;
     }
 
+    /* ✅ PROGRESS BAR - SHIFTED UP */
     .progress-section {
-        margin: 32px 0;
+        margin: 15px 0;
     }
 
     .progress-bar-container {
         position: relative;
-        height: 40px;
+        height: 50px;
         background: #e2e8f0;
-        border-radius: 20px;
+        border-radius: 25px;
         overflow: hidden;
-        margin-bottom: 16px;
+        margin-bottom: 10px;
     }
 
     .progress-bar-fill {
         height: 100%;
         background: linear-gradient(90deg, #f56565 0%, #ed8936 40%, #ecc94b 60%, #48bb78 80%, #38a169 100%);
-        border-radius: 20px;
+        border-radius: 25px;
         transition: width 0.2s ease;
         display: flex;
         align-items: center;
-        justify-content: flex-end;
-        padding-right: 16px;
+        justify-content: center;
     }
 
     .progress-percentage {
-        font-size: 14px;
+        font-size: 18px;
         font-weight: 700;
         color: white;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
+    /* ✅ STATUS BANNER - SHIFTED UP */
     .status-section {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 12px;
-        padding: 20px;
+        padding: 16px 20px;
         border-radius: 8px;
-        margin-bottom: 24px;
+        margin: 0;
     }
 
         .status-section.red {
@@ -314,34 +353,30 @@
     }
 
     .status-text {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
         color: #1a202c;
     }
 
-    .complete-section {
-        margin-top: auto;
-    }
-
+    /* ✅ BIGGER BUTTONS */
     .btn-complete {
         width: 100%;
         background: linear-gradient(135deg, #48bb78, #38a169);
         color: white;
         border: none;
-        padding: 18px 32px;
+        padding: 14px 20px;
         border-radius: 8px;
-        font-size: 18px;
+        font-size: 14px;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.2s;
-        box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
         text-transform: uppercase;
         letter-spacing: 1px;
+        min-height: 50px;
     }
 
         .btn-complete:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(72, 187, 120, 0.5);
         }
 
         .btn-complete:disabled {
@@ -350,49 +385,51 @@
             transform: none;
         }
 
+    /* EMPTY STATE */
     .empty-weighing {
         flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
         text-align: center;
-        padding: 60px 20px;
+        padding: 30px 15px;
     }
 
     .empty-content {
-        max-width: 400px;
+        max-width: 300px;
     }
 
     .empty-icon {
-        font-size: 64px;
-        margin-bottom: 24px;
+        font-size: 48px;
+        margin-bottom: 15px;
         opacity: 0.3;
     }
 
     .empty-title {
-        font-size: 24px;
+        font-size: 18px;
         font-weight: 700;
         color: #2d3748;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
     }
 
     .empty-text {
-        font-size: 16px;
+        font-size: 13px;
         color: #718096;
-        margin-bottom: 24px;
+        margin-bottom: 15px;
     }
 
     .btn-start {
         background-color: #4a9eff;
         color: white;
         border: none;
-        padding: 14px 32px;
+        padding: 10px 20px;
         border-radius: 6px;
-        font-size: 16px;
+        font-size: 13px;
         font-weight: 600;
         cursor: pointer;
     }
 
+    /* MODALS */
     .modal-overlay {
         position: fixed;
         top: 0;
@@ -408,43 +445,75 @@
 
     .modal-content {
         background: white;
-        border-radius: 12px;
+        border-radius: 8px;
         width: 90%;
-        max-width: 600px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 500px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
 
     .modal-header {
-        padding: 24px;
+        padding: 10px 12px;
         border-bottom: 1px solid #e2e8f0;
     }
 
     .modal-title {
-        font-size: 20px;
+        font-size: 13px;
         font-weight: 600;
         color: #1a202c;
         margin: 0;
     }
 
     .modal-body {
-        padding: 24px;
+        padding: 10px 12px;
     }
 
+        .modal-body p {
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .modal-body label {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 4px;
+        }
+
+        .modal-body textarea,
+        .modal-body input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .modal-body textarea {
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        .modal-body > div {
+            margin-bottom: 10px;
+        }
+
     .modal-footer {
-        padding: 20px 24px;
+        padding: 8px 12px;
         border-top: 1px solid #e2e8f0;
         display: flex;
         justify-content: flex-end;
-        gap: 12px;
+        gap: 8px;
     }
 
     .btn-secondary {
         background-color: #e2e8f0;
         color: #4a5568;
         border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
     }
@@ -453,9 +522,9 @@
         background-color: #f56565;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
     }
@@ -464,12 +533,116 @@
         background-color: #4a9eff;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
     }
+
+    /* ========================================= */
+    /* ✅ STAGE 1 - BIGGER COMPONENTS */
+    /* ========================================= */
+
+    .weighing-content > div > div[style*="display: flex"][style*="gap: 32px"] > div {
+        padding: 16px !important;
+    }
+
+    .weighing-content > div > div[style*="display: flex"][style*="gap: 32px"] .percentage-label {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* Bigger dropdowns in Stage 1 */
+    .weighing-content select {
+        padding: 12px 14px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        border: 2px solid #4a9eff !important;
+    }
+
+    /* ✅ COMPACT SELECTED BOWL BANNER */
+    .weighing-content > div > div > div[style*="margin: 16px 0"][style*="padding: 16px"][style*="background: #fff3cd"] {
+        padding: 6px !important;
+        margin: 8px 0 !important;
+    }
+
+        .weighing-content > div > div > div[style*="margin: 16px 0"][style*="padding: 16px"][style*="background: #fff3cd"] p {
+            font-size: 10px !important;
+        }
+
+    /* ✅ COMPACT BOWL VERIFIED BANNER */
+    .weighing-content > div > div > div[style*="padding: 20px"][style*="background: #c6f6d5"] {
+        padding: 8px !important;
+        margin: 8px 0 !important;
+    }
+
+        .weighing-content > div > div > div[style*="padding: 20px"][style*="background: #c6f6d5"] span[style*="font-size: 32px"] {
+            font-size: 20px !important;
+            margin-bottom: 3px !important;
+        }
+
+        .weighing-content > div > div > div[style*="padding: 20px"][style*="background: #c6f6d5"] span[style*="font-size: 16px"],
+        .weighing-content > div > div > div[style*="padding: 20px"][style*="background: #c6f6d5"] span[style*="font-weight: 700"] {
+            font-size: 11px !important;
+        }
+
+    /* ✅ SMALLER VERIFY BOWL BUTTON */
+    .weighing-content .btn-complete[style*="font-size: 14px"][style*="padding: 12px"] {
+        padding: 8px 12px !important;
+        font-size: 11px !important;
+        min-height: 36px !important;
+        margin-top: 12px !important;
+    }
+
+    /* ✅ COMPACT WARNING BANNER (Stage 1) */
+    .weighing-content > div > div[style*="background: #fff3cd"][style*="padding: 24px"] {
+        padding: 8px 12px !important;
+        margin-bottom: 10px !important;
+    }
+
+    .weighing-content > div > div[style*="background: #fff3cd"] span[style*="font-size: 48px"] {
+        font-size: 20px !important;
+    }
+
+    .weighing-content > div > div[style*="background: #fff3cd"] p[style*="font-size: 18px"] {
+        font-size: 11px !important;
+        margin-bottom: 2px !important;
+    }
+
+    .weighing-content > div > div[style*="background: #fff3cd"] p[style*="font-size: 14px"] {
+        font-size: 10px !important;
+    }
+
+    /* ✅ COMPACT TRANSFER STATUS BOXES */
+    .weighing-content > div > div[style*="margin-top: 24px"][style*="padding: 20px"] {
+        padding: 10px 14px !important;
+        margin-top: 12px !important;
+    }
+
+        .weighing-content > div > div[style*="margin-top: 24px"][style*="padding: 20px"] div[style*="font-size: 32px"] {
+            font-size: 24px !important;
+            margin-bottom: 6px !important;
+        }
+
+        .weighing-content > div > div[style*="margin-top: 24px"][style*="padding: 20px"] p[style*="font-size: 16px"] {
+            font-size: 12px !important;
+        }
+
+        .weighing-content > div > div[style*="margin-top: 24px"][style*="padding: 20px"] p[style*="font-size: 13px"] {
+            font-size: 10px !important;
+        }
+
+    /* Bigger bowl info boxes in Stage 1 */
+    .weighing-content > div > div > div[style*="background: #e6f7ff"] {
+        padding: 16px !important;
+    }
+
+        .weighing-content > div > div > div[style*="background: #e6f7ff"] p {
+            font-size: 13px !important;
+            font-weight: 700 !important;
+        }
 </style>
 
 <div class="weighing-container">
@@ -522,7 +695,7 @@
         </div>
 
         <!-- Main Content -->
-        <div class="weighing-content">
+        <div class="weighing-content" id="weighing-content">
             <!-- Stage Indicator -->
             <div class="stage-indicator">
                 <div class="stage-title">Weighing Process</div>
@@ -573,7 +746,7 @@
                     <div style="display: flex; gap: 32px; opacity: @(isModbusReading ? "1" : "0.5"); pointer-events: @(isModbusReading ? "auto" : "none");">
                         <!-- Ingredient Bowl Selection -->
                         <div style="flex: 1; padding: 24px; background: #f7fafc; border-radius: 12px; border: 2px solid @(ingredientBowlVerified ? "#48bb78" : "#e2e8f0");">
-                            <div class="weight-label" style="text-align: center;">Scale 1: Ingredient Bowl</div>
+                            <div class="percentage-label" style="text-align: center; font-size: 14px; margin-bottom: 16px;">Scale 1: Ingredient Bowl</div>
                             <div class="bowl-size-badge" style="margin: 16px auto; display: inline-flex; width: 100%; justify-content: center;">
                                 🥣 @session.CurrentIngredient?.BowlSize Bowl Required
                             </div>
@@ -586,37 +759,31 @@
                                     <option value="">-- Select @session.CurrentIngredient?.BowlSize Bowl --</option>
                                     @foreach (var bowl in availableIngredientBowls)
                                     {
-                                        <option value="@bowl.BowlCode">@bowl.BowlCode - @bowl.Weight.ToString("F3") kg</option>
+                                        <option value="@bowl.BowlCode">@bowl.BowlCode</option>
                                     }
                                 </select>
                             </div>
 
                             @if (!string.IsNullOrEmpty(selectedIngredientBowlCode))
                             {
-                                <div style="margin: 16px 0; padding: 16px; background: #fff3cd; border-radius: 8px;">
-                                    <p style="margin: 0; font-size: 13px; color: #856404;">
-                                        Selected: <strong>@selectedIngredientBowlCode</strong><br />
-                                        Expected: <strong>@selectedIngredientBowlWeight.ToString("F3") kg</strong>
+                                <div style="margin: 16px 0; padding: 16px; background: #fff3cd; border-radius: 8px; text-align: center;">
+                                    <p style="margin: 0; font-size: 14px; color: #856404; font-weight: 600;">
+                                        Selected Bowl: <strong>@selectedIngredientBowlCode</strong>
                                     </p>
                                 </div>
                             }
 
-                            <div style="text-align: center; margin: 24px 0;">
-                                <div class="weight-value" style="font-size: 48px; color: @(ingredientBowlVerified ? "#48bb78" : "#1a202c");">
-                                    @scale1Weight.ToString("F3") <span class="weight-unit" style="font-size: 20px;">kg</span>
-                                </div>
-                            </div>
-
                             @if (ingredientBowlVerified)
                             {
-                                <div style="padding: 16px; background: #c6f6d5; border-radius: 8px; text-align: center;">
-                                    <span style="color: #22543d; font-weight: 700;">✓ Bowl Verified</span>
+                                <div style="padding: 20px; background: #c6f6d5; border-radius: 8px; text-align: center; margin: 24px 0;">
+                                    <span style="font-size: 32px; display: block; margin-bottom: 8px;">✓</span>
+                                    <span style="color: #22543d; font-weight: 700; font-size: 16px;">Bowl Verified</span>
                                 </div>
                             }
                             else if (!string.IsNullOrEmpty(selectedIngredientBowlCode))
                             {
-                                <button class="btn-complete" @onclick="VerifyIngredientBowl" style="font-size: 14px; padding: 12px;">
-                                    ✓ Verify Bowl Weight
+                                <button class="btn-complete" @onclick="VerifyIngredientBowl" style="font-size: 14px; padding: 12px; margin-top: 24px;">
+                                    ✓ Verify Bowl
                                 </button>
                             }
                         </div>
@@ -625,7 +792,7 @@
                         @if (session.CurrentIngredientIndex == 0)
                         {
                             <div style="flex: 1; padding: 24px; background: #f7fafc; border-radius: 12px; border: 2px solid @(mixingBowlVerified ? "#48bb78" : "#e2e8f0");">
-                                <div class="weight-label" style="text-align: center;">Scale 2: Mixing Bowl</div>
+                                <div class="percentage-label" style="text-align: center; font-size: 14px; margin-bottom: 16px;">Scale 2: Mixing Bowl</div>
                                 <div class="bowl-size-badge" style="margin: 16px auto; display: inline-flex; width: 100%; justify-content: center;">
                                     🥣 Mixing Bowl (Cumulative)
                                 </div>
@@ -638,37 +805,31 @@
                                         <option value="">-- Select Mixing Bowl --</option>
                                         @foreach (var bowl in availableMixingBowls)
                                         {
-                                            <option value="@bowl.BowlCode">@bowl.BowlCode - @bowl.Weight.ToString("F3") kg</option>
+                                            <option value="@bowl.BowlCode">@bowl.BowlCode</option>
                                         }
                                     </select>
                                 </div>
 
                                 @if (!string.IsNullOrEmpty(selectedMixingBowlCode))
                                 {
-                                    <div style="margin: 16px 0; padding: 16px; background: #fff3cd; border-radius: 8px;">
-                                        <p style="margin: 0; font-size: 13px; color: #856404;">
-                                            Selected: <strong>@selectedMixingBowlCode</strong><br />
-                                            Expected: <strong>@selectedMixingBowlWeight.ToString("F3") kg</strong>
+                                    <div style="margin: 16px 0; padding: 16px; background: #fff3cd; border-radius: 8px; text-align: center;">
+                                        <p style="margin: 0; font-size: 14px; color: #856404; font-weight: 600;">
+                                            Selected Bowl: <strong>@selectedMixingBowlCode</strong>
                                         </p>
                                     </div>
                                 }
 
-                                <div style="text-align: center; margin: 24px 0;">
-                                    <div class="weight-value" style="font-size: 48px; color: @(mixingBowlVerified ? "#48bb78" : "#1a202c");">
-                                        @scale2Weight.ToString("F3") <span class="weight-unit" style="font-size: 20px;">kg</span>
-                                    </div>
-                                </div>
-
                                 @if (mixingBowlVerified)
                                 {
-                                    <div style="padding: 16px; background: #c6f6d5; border-radius: 8px; text-align: center;">
-                                        <span style="color: #22543d; font-weight: 700;">✓ Bowl Verified</span>
+                                    <div style="padding: 20px; background: #c6f6d5; border-radius: 8px; text-align: center; margin: 24px 0;">
+                                        <span style="font-size: 32px; display: block; margin-bottom: 8px;">✓</span>
+                                        <span style="color: #22543d; font-weight: 700; font-size: 16px;">Bowl Verified</span>
                                     </div>
                                 }
                                 else if (!string.IsNullOrEmpty(selectedMixingBowlCode))
                                 {
-                                    <button class="btn-complete" @onclick="VerifyMixingBowl" style="font-size: 14px; padding: 12px;">
-                                        ✓ Verify Bowl Weight
+                                    <button class="btn-complete" @onclick="VerifyMixingBowl" style="font-size: 14px; padding: 12px; margin-top: 24px;">
+                                        ✓ Verify Bowl
                                     </button>
                                 }
                             </div>
@@ -677,25 +838,15 @@
                         {
                             <!-- Show Scale 2 info for subsequent ingredients -->
                             <div style="flex: 1; padding: 24px; background: #e6f7ff; border-radius: 12px; border: 2px solid #4a9eff;">
-                                <div class="weight-label" style="text-align: center;">Scale 2: Mixing Bowl</div>
+                                <div class="percentage-label" style="text-align: center; font-size: 14px; margin-bottom: 16px;">Scale 2: Mixing Bowl</div>
                                 <div style="text-align: center; padding: 16px;">
                                     <p style="margin: 0; color: #0c5460; font-size: 14px; font-weight: 600;">
                                         📝 Mixing Bowl: @session.SelectedMixingBowlCode
                                     </p>
-                                    <p style="margin: 8px 0 0 0; color: #0c5460; font-size: 13px;">
-                                        Tare Weight: @session.MixingBowlWeightBefore.ToString("F3") kg
-                                    </p>
                                 </div>
-                                <div style="text-align: center; margin: 24px 0;">
-                                    <div class="weight-value" style="font-size: 48px;">
-                                        @((scale2Weight - session.MixingBowlWeightBefore).ToString("F3")) <span class="weight-unit" style="font-size: 20px;">kg</span>
-                                    </div>
-                                    <p style="color: #718096; font-size: 12px; margin-top: 8px;">
-                                        NET CUMULATIVE WEIGHT
-                                    </p>
-                                </div>
-                                <div style="padding: 16px; background: #c6f6d5; border-radius: 8px; text-align: center;">
-                                    <span style="color: #22543d; font-weight: 700;">✓ Mixing Bowl On Scale 2</span>
+                                <div style="padding: 20px; background: #c6f6d5; border-radius: 8px; text-align: center; margin: 24px 0;">
+                                    <span style="font-size: 32px; display: block; margin-bottom: 8px;">✓</span>
+                                    <span style="color: #22543d; font-weight: 700; font-size: 16px;">Mixing Bowl On Scale 2</span>
                                 </div>
                             </div>
                         }
@@ -710,10 +861,10 @@
                 </div>
             }
 
-            <!-- STAGE 2: Weigh Ingredient (Scale 1 only, hide during transfer) -->
+            <!-- ✅ STAGE 2: Weigh Ingredient (Scale 1 - EXPANDED) -->
             @if (session.CurrentStage == WeighingStage.WeighIngredient && !isInTransferStage)
             {
-                <div class="scale-card">
+                <div class="scale-card scale-1-active" id="scale1-card">
                     <div class="scale-header">
                         <div class="scale-title-section">
                             <span class="scale-label">STAGE 2: WEIGH INGREDIENT</span>
@@ -722,14 +873,11 @@
                         <div class="ingredient-code">@session.CurrentIngredient?.IngredientCode</div>
                     </div>
 
-                    <div class="weight-display">
-                        <div class="weight-label">NET INGREDIENT WEIGHT</div>
-                        <div class="weight-value">
-                            @netWeight.ToString("F3") <span class="weight-unit">kg</span>
+                    <div class="percentage-display">
+                        <div class="percentage-label">INGREDIENT PROGRESS</div>
+                        <div class="percentage-value" style="color: @GetPercentageColor(netProgress);">
+                            @netProgress<span style="font-size: 100px;">%</span>
                         </div>
-                        <p style="color: #718096; font-size: 14px; margin-top: 8px;">
-                            (Scale 1: @scale1Weight.ToString("F3") kg - Bowl: @session.IngredientBowlWeight.ToString("F3") kg)
-                        </p>
                     </div>
 
                     <div class="progress-section">
@@ -754,34 +902,28 @@
                 </div>
             }
 
-            <!-- Scale 2 - Always Visible (During Weighing & Transfer) -->
+            <!-- ✅ Scale 2 - COMPACT when waiting, EXPANDED during transfer -->
             @if (session.CurrentStage == WeighingStage.WeighIngredient)
             {
-                <div class="scale-card">
+                <div class="scale-card @(isInTransferStage ? "scale-2-active" : "scale-2-waiting")" id="scale2-card">
                     <div class="scale-header">
                         <div class="scale-title-section">
-                            <span class="scale-label">SCALE 2</span>
-                            <span class="scale-subtitle">Mixture Bowl (Cumulative)</span>
+                            <span class="scale-label">SCALE 2 - CUMULATIVE PROGRESS</span>
+                            <span class="scale-subtitle">Mixture Bowl Total</span>
                         </div>
                     </div>
 
-                    @if (session.MixingBowlWeightBefore > 0)
-                    {
-                        <div style="padding: 20px; background: #e6f7ff; border-radius: 8px; margin-bottom: 16px;">
-                            <p style="margin: 0; color: #0c5460; font-size: 13px; font-weight: 600;">
-                                📝 Bowl Tare Weight: @session.MixingBowlWeightBefore.ToString("F3") kg
-                            </p>
-                        </div>
-                    }
-
-                    <div class="weight-display">
-                        <div class="weight-label">NET CUMULATIVE WEIGHT</div>
-                        <div class="weight-value">
-                            @((scale2Weight - session.MixingBowlWeightBefore).ToString("F3")) <span class="weight-unit">kg</span>
-                        </div>
-                        <p style="color: #718096; font-size: 14px; margin-top: 8px;">
-                            (Scale 2: @scale2Weight.ToString("F3") kg - Bowl: @session.MixingBowlWeightBefore.ToString("F3") kg)
+                    <div style="padding: 20px; background: #e6f7ff; border-radius: 8px; margin-bottom: 16px; text-align: center;">
+                        <p style="margin: 0; color: #0c5460; font-size: 13px; font-weight: 600;">
+                            📝 Mixing Bowl: @session.SelectedMixingBowlCode
                         </p>
+                    </div>
+
+                    <div class="percentage-display">
+                        <div class="percentage-label">BATCH COMPLETION</div>
+                        <div class="percentage-value" style="color: @GetPercentageColor(scale2Progress);">
+                            @scale2Progress<span style="font-size: 48px;">%</span>
+                        </div>
                     </div>
 
                     <div class="progress-section">
@@ -798,13 +940,13 @@
                     @if (isInTransferStage)
                     {
                         <div style="margin-top: 24px; padding: 20px; background: @(transferWeightMatches ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fff3cd, #ffeaa7)");
-                                                                        border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
+                                                                                                border: 3px solid @(transferWeightMatches ? "#48bb78" : "#ffc107"); border-radius: 12px;">
                             <div style="text-align: center;">
                                 <div style="font-size: 32px; margin-bottom: 8px;">
                                     @(transferWeightMatches ? "✅" : "⏳")
                                 </div>
                                 <p style="margin: 0; font-size: 16px; font-weight: 700; color: @(transferWeightMatches ? "#22543d" : "#856404");">
-                                    @(transferWeightMatches ? "Weight Verified - Transfer Complete!" : "Transferring Material...")
+                                    @(transferWeightMatches ? "Transfer Complete!" : "Transferring Material...")
                                 </p>
                                 <p style="margin: 8px 0 0 0; font-size: 13px; color: @(transferWeightMatches ? "#22543d" : "#856404");">
                                     @(transferWeightMatches ? "Click button below to continue" : "Waiting for correct weight on Scale 2")
@@ -816,16 +958,16 @@
                                 disabled="@(!transferWeightMatches)"
                                 @onclick="ConfirmTransfer"
                                 style="margin-top: 20px; background: @(transferWeightMatches ? "#28a745" : "#cbd5e0");
-                                                                           cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
-                                                                           opacity: @(transferWeightMatches ? "1" : "0.5");">
-                            @(transferWeightMatches ? "✓ COMPLETE TRANSFER" : "⏳ WAITING FOR CORRECT WEIGHT...")
+                                                                                                   cursor: @(transferWeightMatches ? "pointer" : "not-allowed");
+                                                                                                   opacity: @(transferWeightMatches ? "1" : "0.5");">
+                            @(transferWeightMatches ? "✓ COMPLETE TRANSFER" : "⏳ WAITING...")
                         </button>
                     }
                     else
                     {
                         <div class="status-section green">
                             <span class="status-icon">✓</span>
-                            <span class="status-text">Cumulative total tracking</span>
+                            <span class="status-text">Tracking Total</span>
                         </div>
                     }
                 </div>
@@ -847,7 +989,6 @@
                     Are you sure you want to abort batch <strong>@session?.BatchId</strong>?
                 </p>
 
-                <!-- Abort Reason -->
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">
                         Abort Reason *
@@ -863,7 +1004,6 @@
                     }
                 </div>
 
-                <!-- Aborted By -->
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 8px;">
                         Aborted By *
@@ -886,52 +1026,6 @@
         </div>
     </div>
 }
-<!-- Bowl Removal Modal - Only for last ingredient -->
-@if (showBowlRemovalModal)
-{
-    <div class="modal-overlay">
-        <div class="modal-content" @onclick:stopPropagation="true" style="max-width: 500px;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
-                <h2 class="modal-title" style="color: white;">🧹 Remove Mixing Bowl</h2>
-            </div>
-            <div class="modal-body" style="padding: 32px; text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 16px;">🥣 ➡️ ❌</div>
-                <h3 style="font-size: 20px; font-weight: 600; color: #1a202c; margin-bottom: 16px;">
-                    All Ingredients Complete!
-                </h3>
-                <p style="color: #666; font-size: 14px; margin-bottom: 24px;">
-                    Remove the mixing bowl from Scale 2
-                </p>
-
-                <div style="padding: 20px; border-radius: 12px; margin-bottom: 24px;
-                                        background: @(isScale2Clear ? "linear-gradient(135deg, #c6f6d5, #9ae6b4)" : "linear-gradient(135deg, #fed7d7, #fc8181)");
-                                        border: 3px solid @(isScale2Clear ? "#48bb78" : "#f56565");">
-                    <div style="font-size: 32px; margin-bottom: 8px;">
-                        @(isScale2Clear ? "✅" : "⚠️")
-                    </div>
-                    <div style="font-weight: 700; font-size: 14px; color: #1a202c; margin-bottom: 8px;">SCALE 2</div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 28px; font-weight: 700; color: #1a202c;">
-                        @scale2Weight.ToString("F3") kg
-                    </div>
-                    <div style="font-size: 12px; margin-top: 8px; font-weight: 600;">
-                        @(isScale2Clear ? "CLEAR ✓" : "REMOVE BOWL")
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary"
-                        @onclick="CompleteBowlRemoval"
-                        disabled="@(!isScale2Clear)"
-                        style="background: @(isScale2Clear ? "#28a745" : "#cbd5e0");
-                                           padding: 12px 32px;
-                                           cursor: @(isScale2Clear ? "pointer" : "not-allowed");
-                                           opacity: @(isScale2Clear ? "1" : "0.6");">
-                    @(isScale2Clear ? "✓ Complete Batch" : "⏳ Waiting...")
-                </button>
-            </div>
-        </div>
-    </div>
-}
 
 @code {
     [Parameter]
@@ -945,14 +1039,10 @@
 
     private bool isInTransferStage = false;
     private bool transferWeightMatches = false;
-    private bool showBowlRemovalModal = false;
-    private decimal bowlRemovalTolerance = 0.1m;
 
     private decimal scale1Weight => ModbusService.Scale1Weight;
     private decimal scale2Weight => ModbusService.Scale2Weight;
     private decimal netWeight => session != null ? WeighingService.GetNetIngredientWeight(scale1Weight) : 0;
-
-    private bool isScale2Clear => Math.Abs(scale2Weight) <= bowlRemovalTolerance;
 
     private int netProgress = 0;
     private int scale2Progress = 0;
@@ -967,14 +1057,12 @@
     private bool ingredientBowlVerified = false;
     private bool mixingBowlVerified = false;
     private string currentLoggedInUser = "";
-    private bool showValidation = false;  // ✅ ADD THIS
-    private string abortReason = "";      // ✅ ADD THIS
-    private string abortedBy = "";        // ✅ ADD THIS
-
+    private bool showValidation = false;
+    private string abortReason = "";
+    private string abortedBy = "";
 
     protected override async Task OnInitializedAsync()
     {
-        // ✅ Get current logged-in user from AuthService property
         if (AuthService.CurrentUser != null)
         {
             currentLoggedInUser = AuthService.CurrentUser.Username;
@@ -996,6 +1084,15 @@
             await LoadAvailableBowls();
             UpdateStatus();
         }
+    }
+
+    private string GetPercentageColor(int percentage)
+    {
+        if (percentage < 40) return "#f56565";
+        if (percentage < 70) return "#ed8936";
+        if (percentage < 85) return "#ecc94b";
+        if (percentage < 105) return "#48bb78";
+        return "#f56565";
     }
 
     private async Task LoadAvailableBowls()
@@ -1063,7 +1160,7 @@
         if (result.isValid)
         {
             ingredientBowlVerified = true;
-            await JSRuntime.InvokeVoidAsync("alert", $"✅ {result.message}");
+            await JSRuntime.InvokeVoidAsync("alert", "✅ Bowl verified successfully!");
         }
         else
         {
@@ -1085,7 +1182,7 @@
         if (result.isValid)
         {
             mixingBowlVerified = true;
-            await JSRuntime.InvokeVoidAsync("alert", $"✅ {result.message}");
+            await JSRuntime.InvokeVoidAsync("alert", "✅ Bowl verified successfully!");
         }
         else
         {
@@ -1115,12 +1212,11 @@
     {
         if (isModbusReading) return;
 
-        // ✅ Update operator to current logged-in user AND save to database
         if (session != null && !string.IsNullOrEmpty(currentLoggedInUser))
         {
             await WeighingService.UpdateSessionOperatorAsync(session.BatchId, currentLoggedInUser);
-            Console.WriteLine($"✅ Operator updated to: {currentLoggedInUser}");
         }
+
         try
         {
             if (!isModbusConnected)
@@ -1173,25 +1269,13 @@
 
         try
         {
-            Console.WriteLine("⏹️ Stopping Modbus reading...");
-
-            // Unsubscribe from event
             ModbusService.WeightUpdated -= OnWeightUpdated;
-
-            // Cancel the reading loop
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
-
-            // ✅ CRITICAL: Disconnect from PLC completely
             ModbusService.Disconnect();
-
-            // Update state
             isModbusReading = false;
-            isModbusConnected = false; // ✅ Mark as disconnected!
-
-            Console.WriteLine("✅ Modbus stopped and disconnected");
-
+            isModbusConnected = false;
             StateHasChanged();
         }
         catch (Exception ex)
@@ -1238,6 +1322,7 @@
         }
     }
 
+    // ✅ AUTO-SCROLL TO SCALE 2
     private async Task ReadyToTransfer()
     {
         if (session == null || !netStatus.canComplete) return;
@@ -1245,33 +1330,34 @@
         await WeighingService.ReadyToTransferAsync(session.BatchId, netWeight);
         isInTransferStage = true;
         transferWeightMatches = false;
+
         StateHasChanged();
+
+        // ✅ AUTO-SCROLL TO SCALE 2 AFTER UI UPDATE
+        await Task.Delay(150);
+        await JSRuntime.InvokeVoidAsync("eval",
+            "document.getElementById('scale2-card').scrollIntoView({ behavior: 'smooth', block: 'start' })");
     }
 
     private async Task ConfirmTransfer()
     {
         if (session == null) return;
 
-        // ✅ NEW: Use tuple deconstruction for the enhanced return type
         var (success, message, deviation) = await WeighingService.ConfirmTransferAsync(
             session.BatchId,
             scale2Weight);
 
         if (!success)
         {
-            // Transfer failed - show error message
             await JSRuntime.InvokeVoidAsync("alert", message);
             return;
         }
 
-        // ✅ Transfer succeeded
         isInTransferStage = false;
         transferWeightMatches = false;
 
-        // ✅ Refresh session - it might have been nulled by the service
         session = WeighingService.GetActiveSession();
 
-        // ✅ If session is now null, batch is complete!
         if (session == null)
         {
             StopModbusReading();
@@ -1280,16 +1366,13 @@
             return;
         }
 
-        // Check if starting a new repetition (CurrentIngredientIndex was reset to 0)
         if (session.CurrentIngredientIndex == 0)
         {
-            // ✅ NEW REPETITION - Reset BOTH bowls
             await JSRuntime.InvokeVoidAsync("alert",
                 $"✅ Repetition {session.CurrentRepetition - 1} Complete!\n\n" +
                 $"Starting Repetition {session.CurrentRepetition} of {session.TotalRepetitions}\n\n" +
                 "Please select and verify BOTH bowls again.");
 
-            // Reset ALL bowl selection states
             selectedIngredientBowlCode = string.Empty;
             selectedIngredientBowlWeight = 0;
             ingredientBowlVerified = false;
@@ -1309,15 +1392,12 @@
             return;
         }
 
-        // Not new repetition - just next ingredient (mixing bowl stays)
         await JSRuntime.InvokeVoidAsync("alert",
             $"✅ Transfer Complete!\n\n" +
-            $"Deviation: {deviation:+0.000;-0.000} kg\n\n" +
             "Remove ingredient bowl from Scale 1.\n" +
             "Mixing bowl stays on Scale 2.\n\n" +
-            $"Ready for next ingredient.");
+            "Ready for next ingredient.");
 
-        // Only reset ingredient bowl
         selectedIngredientBowlCode = string.Empty;
         selectedIngredientBowlWeight = 0;
         ingredientBowlVerified = false;
@@ -1333,17 +1413,6 @@
         StateHasChanged();
     }
 
-    private async Task CompleteBowlRemoval()
-    {
-        if (session == null || !isScale2Clear) return;
-
-        showBowlRemovalModal = false;
-        StopModbusReading();
-
-        await JSRuntime.InvokeVoidAsync("alert", "🎉 Batch completed successfully!");
-        Navigation.NavigateTo("/production");
-    }
-
     private async Task PauseSession()
     {
         if (session == null) return;
@@ -1355,7 +1424,7 @@
     private void OpenAbortModal()
     {
         abortReason = "";
-        abortedBy = currentLoggedInUser; // ✅ Pre-fill with current operator
+        abortedBy = currentLoggedInUser;
         showValidation = false;
         showAbortModal = true;
     }
@@ -1372,20 +1441,16 @@
     {
         if (session == null) return;
 
-        // ✅ VALIDATION
         showValidation = true;
 
         if (string.IsNullOrWhiteSpace(abortReason) || string.IsNullOrWhiteSpace(abortedBy))
         {
-            StateHasChanged(); // Show validation errors
+            StateHasChanged();
             return;
         }
 
-        // ✅ Stop Modbus and abort with reason
         StopModbusReading();
         await WeighingService.AbortSessionAsync(session.BatchId, abortReason, abortedBy);
-
-        // Navigate away
         Navigation.NavigateTo("/production");
     }
 
