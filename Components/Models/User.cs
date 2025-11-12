@@ -38,6 +38,7 @@
         public bool CanViewBatchHistory { get; set; }
         public bool CanCreateBatches { get; set; }
         public bool CanManageIngredients { get; set; }
+        public bool CanViewReports { get; set; }  // ADD THIS LINE
 
         public static UserPermissions GetPermissionsForRole(string role)
         {
@@ -53,7 +54,8 @@
                     CanManageBowls = true,
                     CanViewBatchHistory = true,
                     CanCreateBatches = true,
-                    CanManageIngredients = true
+                    CanManageIngredients = true,
+                    CanViewReports = true
                 },
                 UserRoles.Developer => new UserPermissions
                 {
@@ -65,7 +67,8 @@
                     CanManageBowls = true,
                     CanViewBatchHistory = true,
                     CanCreateBatches = true,
-                    CanManageIngredients = true
+                    CanManageIngredients = true,
+                    CanViewReports = true
                 },
                 UserRoles.Supervisor => new UserPermissions
                 {
@@ -77,7 +80,8 @@
                     CanManageBowls = true,
                     CanViewBatchHistory = true,
                     CanCreateBatches = true,
-                    CanManageIngredients = false
+                    CanManageIngredients = false,
+                    CanViewReports = true
                 },
                 UserRoles.Operator => new UserPermissions
                 {
@@ -89,7 +93,8 @@
                     CanManageBowls = true,
                     CanViewBatchHistory = true,
                     CanCreateBatches = false,
-                    CanManageIngredients = false
+                    CanManageIngredients = false,
+                    CanViewReports = false
                 },
                 _ => new UserPermissions()
             };

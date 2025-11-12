@@ -25,6 +25,36 @@
         animation: slideUp 0.4s ease-out;
     }
 
+    .company-logo {
+        width: 300px; /* or smaller like 250px, 200px */
+        height: auto;
+        margin: 0 auto 20px auto; /* centers the div itself */
+        text-align: center;
+    }
+
+        .company-logo img {
+            width: 100%; /* Makes image fit the container */
+            height: auto;
+            max-width: 100%;
+            display: block;
+            margin: 0 auto; /* extra centering for the image */
+        }
+
+    .firstweigh-logo {
+        width: 300px; /* or smaller like 250px, 200px */
+        height: auto;
+        margin: 0 auto 20px auto; /* centers the div itself */
+        text-align: center;
+    }
+
+        .firstweigh-logo img {
+            width: 100%; /* Makes image fit the container */
+            height: auto;
+            max-width: 100%;
+            display: block;
+            margin: 0 auto; /* extra centering for the image */
+        }
+
     @@keyframes slideUp {
         from {
             opacity: 0;
@@ -244,11 +274,12 @@
 <div class="login-container">
     <div class="login-card">
         <div class="login-header">
-            <div class="login-logo">
-                <span class="logo-text">FW</span>
+            <div class="company-logo">
+                <img src="/Images/EngePlas.png" alt="Company Logo" />
             </div>
-            <h1 class="login-title">FirstWeigh</h1>
-            <p class="login-subtitle">Sign in to your account</p>
+            <div class="firstweigh-logo">
+                <img src="/Images/FirstWeigh.png" alt="FirstWeigh Logo"/>
+            </div>
         </div>
 
         <div class="error-message @(showError ? "show" : "")">

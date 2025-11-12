@@ -466,6 +466,14 @@
                     <span class="action-icon">🏭</span>
                     <span class="action-label">Production Overview</span>
                 </div>
+                <div class="action-card" @onclick="NavigateToUsers">
+                    <span class="action-icon">👥</span>
+                    <span class="action-label">Manage Users</span>
+                </div>
+                <div class="action-card" @onclick="NavigateToReports">
+                    <span class="action-icon">📊</span>
+                    <span class="action-label">View Reports</span>
+                </div>
             </div>
         </div>
 
@@ -681,5 +689,24 @@
         public string BatchCode { get; set; } = string.Empty;
         public string RecipeName { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+    }
+    private void NavigateToUsers()
+    {
+        if (!UserPermissions.CanManageUsers)
+        {
+            ShowUnauthorized("You don't have permission to manage users.");
+            return;
+        }
+        Navigation.NavigateTo("/users");
+    }
+
+    private void NavigateToReports()
+    {
+        if (!UserPermissions.CanViewReports)
+        {
+            ShowUnauthorized("You don't have permission to view reports.");
+            return;
+        }
+        Navigation.NavigateTo("/reports");
     }
 }
