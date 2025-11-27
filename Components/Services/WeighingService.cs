@@ -1,4 +1,5 @@
 ﻿using FirstWeigh.Models;
+using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace FirstWeigh.Services
@@ -8,32 +9,37 @@ namespace FirstWeigh.Services
         private readonly IBatchService _batchService;
         private readonly RecipeService _recipeService;
         private readonly ReportService _reportService;
+        private readonly ILogger<WeighingService> _logger;
         private WeighingSession? _activeSession;
 
         // Configuration constants
-        private const decimal BASE_TRANSFER_TOLERANCE = 0.050m;  // 50g base tolerance
-        private const decimal PER_INGREDIENT_TOLERANCE = 0.015m; // 15g per ingredient cumulative
-        private const decimal BOWL_VERIFICATION_TOLERANCE = 0.050m; // 50g for bowl weight verification
-        private const decimal SCALE_STABILITY_TOLERANCE = 0.005m; // 5g for stability check
+        private const decimal BASE_TRANSFER_TOLERANCE = 0.050m;
+        private const decimal PER_INGREDIENT_TOLERANCE = 0.015m;
+        private const decimal BOWL_VERIFICATION_TOLERANCE_PERCENT = 2.0m;
+        private const decimal SCALE_STABILITY_TOLERANCE = 0.005m;
 
         public WeighingService(
             IBatchService batchService,
             RecipeService recipeService,
-            ReportService reportService)
+            ReportService reportService,
+            ILogger<WeighingService> logger)
         {
             _batchService = batchService;
             _recipeService = recipeService;
             _reportService = reportService;
+            _logger = logger;
         }
+
         public async Task<bool> UpdateSessionOperatorAsync(string batchId, string operatorName)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("UpdateSessionOperator failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
-            // Update session
             _activeSession.OperatorName = operatorName;
 
-            // ✅ Update WeighingRecord in database
             if (!string.IsNullOrEmpty(_activeSession.WeighingRecordId))
             {
                 var record = await _reportService.GetWeighingRecordByIdAsync(_activeSession.WeighingRecordId);
@@ -41,28 +47,39 @@ namespace FirstWeigh.Services
                 {
                     record.OperatorName = operatorName;
                     await _reportService.UpdateWeighingRecordAsync(record);
-                    Console.WriteLine($"✅ WeighingRecord operator updated to: {operatorName}");
+                    _logger.LogInformation("WeighingRecord operator updated to: {OperatorName}", operatorName);
                     return true;
                 }
             }
 
             return false;
         }
+
         public async Task<WeighingSession?> StartWeighingSessionAsync(string batchId)
         {
+            _logger.LogInformation("Starting weighing session for batch {BatchId}", batchId);
+
             var batch = await _batchService.GetBatchByIdAsync(batchId);
             if (batch == null || batch.Status != "InProgress")
+            {
+                _logger.LogWarning("Cannot start session - Batch {BatchId} not found or not in progress", batchId);
                 return null;
+            }
 
             var recipe = await _recipeService.GetRecipeByIdAsync(batch.RecipeId);
             if (recipe == null)
+            {
+                _logger.LogWarning("Cannot start session - Recipe {RecipeId} not found", batch.RecipeId);
                 return null;
+            }
 
             var ingredients = await _recipeService.GetRecipeIngredientsAsync(batch.RecipeId);
             if (ingredients == null || !ingredients.Any())
+            {
+                _logger.LogWarning("Cannot start session - No ingredients found for recipe {RecipeId}", batch.RecipeId);
                 return null;
+            }
 
-            // ✅ Create WeighingRecord at session start
             var record = new WeighingRecord
             {
                 RecordId = await GenerateRecordIdAsync(),
@@ -100,7 +117,8 @@ namespace FirstWeigh.Services
                 WeighingRecordId = record.RecordId
             };
 
-            Console.WriteLine($"✅ Weighing session started - Record: {record.RecordId}");
+            _logger.LogInformation("Weighing session started - Record: {RecordId}, Batch: {BatchId}, Recipe: {RecipeName}",
+                record.RecordId, batchId, recipe.RecipeName);
             return _activeSession;
         }
 
@@ -108,7 +126,10 @@ namespace FirstWeigh.Services
                                 string mixingBowlCode, decimal mixingBowlWeight)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("SelectBowls failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
             _activeSession.SelectedIngredientBowlCode = ingredientBowlCode;
             _activeSession.SelectedIngredientBowlWeight = ingredientBowlWeight;
@@ -116,29 +137,44 @@ namespace FirstWeigh.Services
             _activeSession.SelectedMixingBowlWeight = mixingBowlWeight;
             _activeSession.MixingBowlWeightBefore = mixingBowlWeight;
 
-            Console.WriteLine($"✅ Bowls selected - Ingredient: {ingredientBowlCode} ({ingredientBowlWeight:F3} kg), Mixing: {mixingBowlCode} ({mixingBowlWeight:F3} kg)");
+            _logger.LogInformation("Bowls selected - Ingredient: {IngredientBowl} ({IngredientWeight:F3} kg), Mixing: {MixingBowl} ({MixingWeight:F3} kg)",
+                ingredientBowlCode, ingredientBowlWeight, mixingBowlCode, mixingBowlWeight);
             return true;
         }
 
+        // ✅ UPDATED: Now uses percentage-based tolerance
         public (bool isValid, string message) VerifyBowlWeight(
             decimal actualWeight,
             decimal recordedWeight,
             string bowlCode,
-            decimal tolerance = BOWL_VERIFICATION_TOLERANCE)
+            decimal tolerancePercent = BOWL_VERIFICATION_TOLERANCE_PERCENT)
         {
+            // Calculate tolerance based on percentage of recorded weight
+            decimal toleranceAmount = (recordedWeight * tolerancePercent) / 100m;
+
+            // Minimum tolerance of 10g to handle very light bowls
+            toleranceAmount = Math.Max(toleranceAmount, 0.010m);
+
             var difference = Math.Abs(actualWeight - recordedWeight);
 
-            if (difference <= tolerance)
+            _logger.LogDebug("Bowl verification - Bowl: {BowlCode}, Recorded: {RecordedWeight:F3} kg, Actual: {ActualWeight:F3} kg, Tolerance: {TolerancePercent}% (±{ToleranceAmount:F3} kg)",
+                bowlCode, recordedWeight, actualWeight, tolerancePercent, toleranceAmount);
+
+            if (difference <= toleranceAmount)
             {
+                _logger.LogInformation("Bowl {BowlCode} verified successfully - Actual: {ActualWeight:F3} kg, Expected: {RecordedWeight:F3} kg",
+                    bowlCode, actualWeight, recordedWeight);
                 return (true, $"✓ Bowl {bowlCode} verified: {actualWeight:F3} kg");
             }
             else
             {
+                _logger.LogWarning("Bowl {BowlCode} verification FAILED - Actual: {ActualWeight:F3} kg, Expected: {RecordedWeight:F3} kg, Difference: {Difference:F3} kg",
+                    bowlCode, actualWeight, recordedWeight, difference);
                 return (false,
                     $"⚠ Bowl {bowlCode} weight mismatch!\n" +
                     $"Expected: {recordedWeight:F3} kg\n" +
                     $"Actual: {actualWeight:F3} kg\n" +
-                    $"Difference: {difference:F3} kg (max: ±{tolerance:F3} kg)");
+                    $"Difference: {difference:F3} kg (max: ±{toleranceAmount:F3} kg / {tolerancePercent}%)");
             }
         }
 
@@ -153,13 +189,17 @@ namespace FirstWeigh.Services
         public bool RecordBowlWeights(string batchId, decimal ingredientBowlWeight, decimal mixingBowlWeight)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("RecordBowlWeights failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
             _activeSession.IngredientBowlWeight = ingredientBowlWeight;
             _activeSession.MixingBowlWeightBefore = mixingBowlWeight;
             _activeSession.CurrentStage = WeighingStage.WeighIngredient;
 
-            Console.WriteLine($"✅ Bowls recorded - Ingredient bowl: {ingredientBowlWeight:F3} kg, Mixing bowl: {mixingBowlWeight:F3} kg");
+            _logger.LogInformation("Bowls recorded - Ingredient bowl: {IngredientWeight:F3} kg, Mixing bowl: {MixingWeight:F3} kg",
+                ingredientBowlWeight, mixingBowlWeight);
             return true;
         }
 
@@ -186,52 +226,56 @@ namespace FirstWeigh.Services
         public async Task<bool> ReadyToTransferAsync(string batchId, decimal netWeight)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("ReadyToTransfer failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
             _activeSession.NetIngredientWeight = netWeight;
 
-            Console.WriteLine($"✅ Ready to transfer - Net weight: {netWeight:F3} kg");
+            _logger.LogInformation("Ready to transfer - Net weight: {NetWeight:F3} kg, Ingredient: {IngredientCode}",
+                netWeight, _activeSession.CurrentIngredient?.IngredientCode);
             return true;
         }
 
-        public async Task<(bool success, string message, decimal deviation)> ConfirmTransferAsync(string batchId,decimal currentScale2Weight)
+        public async Task<(bool success, string message, decimal deviation)> ConfirmTransferAsync(string batchId, decimal currentScale2Weight)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("ConfirmTransfer failed - No active session for batch {BatchId}", batchId);
                 return (false, "No active session", 0);
+            }
 
             var ingredient = _activeSession.CurrentIngredient;
             if (ingredient == null)
+            {
+                _logger.LogWarning("ConfirmTransfer failed - No current ingredient");
                 return (false, "No current ingredient", 0);
+            }
 
-            // ✅ STEP 1: Calculate expected cumulative from ACTUAL transfers
             decimal expectedCumulative = _activeSession.TransferredIngredients
                 .Where(t => t.RepetitionNumber == _activeSession.CurrentRepetition)
                 .Sum(t => t.ActualNetWeight);
 
-            // Add current ingredient's actual net weight
             expectedCumulative += _activeSession.NetIngredientWeight;
 
-            // ✅ STEP 2: Get net Scale 2 reading (minus bowl tare)
             decimal scale2Before = _activeSession.MixingBowlWeightBefore;
             decimal actualScale2Net = currentScale2Weight - scale2Before;
 
-            // ✅ STEP 3: Calculate deviation
             decimal deviation = actualScale2Net - expectedCumulative;
             decimal absDeviation = Math.Abs(deviation);
 
-            // ✅ STEP 4: Dynamic tolerance based on number of ingredients
             int ingredientsTransferred = _activeSession.CurrentIngredientIndex + 1;
             decimal allowedTolerance = CalculateDynamicTransferTolerance(ingredientsTransferred);
 
-            Console.WriteLine($"📊 Transfer Verification:");
-            Console.WriteLine($"   Expected Cumulative (Actuals): {expectedCumulative:F3} kg");
-            Console.WriteLine($"   Actual Scale 2 Net: {actualScale2Net:F3} kg");
-            Console.WriteLine($"   Deviation: {deviation:F3} kg");
-            Console.WriteLine($"   Allowed Tolerance: ±{allowedTolerance:F3} kg");
+            _logger.LogDebug("Transfer Verification - Expected: {Expected:F3} kg, Actual: {Actual:F3} kg, Deviation: {Deviation:F3} kg, Tolerance: ±{Tolerance:F3} kg",
+                expectedCumulative, actualScale2Net, deviation, allowedTolerance);
 
-            // ✅ STEP 5: Verify within tolerance
             if (absDeviation > allowedTolerance)
             {
+                _logger.LogWarning("Transfer verification FAILED - Deviation {Deviation:F3} kg exceeds tolerance ±{Tolerance:F3} kg",
+                    deviation, allowedTolerance);
+
                 var message = $"⚠️ Scale 2 weight mismatch!\n" +
                     $"Expected: {expectedCumulative:F3} kg\n" +
                     $"Actual: {actualScale2Net:F3} kg\n" +
@@ -244,10 +288,8 @@ namespace FirstWeigh.Services
                 return (false, message, deviation);
             }
 
-            // ✅ STEP 6: Calculate tolerance values
             decimal toleranceValue = (ingredient.TargetWeight * ingredient.TolerancePercentage) / 100;
 
-            // ✅ STEP 7: Record the successful transfer
             var transferRecord = new TransferredIngredient
             {
                 RepetitionNumber = _activeSession.CurrentRepetition,
@@ -263,49 +305,35 @@ namespace FirstWeigh.Services
                 TransferredAt = DateTime.Now,
                 BowlCode = _activeSession.SelectedIngredientBowlCode ?? "",
                 BowlType = ingredient.BowlSize,
-                // ✅ CALCULATE tolerance range from target and tolerance value
-                MinWeight = ingredient.TargetWeight - toleranceValue,  // ✅ FIXED!
-                MaxWeight = ingredient.TargetWeight + toleranceValue,  // ✅ FIXED!
+                MinWeight = ingredient.TargetWeight - toleranceValue,
+                MaxWeight = ingredient.TargetWeight + toleranceValue,
                 ToleranceValue = toleranceValue
             };
 
             _activeSession.TransferredIngredients.Add(transferRecord);
 
-            // ✅ STEP 8: Create WeighingDetail record
             await SaveWeighingDetailAsync(transferRecord);
 
-            Console.WriteLine($"✅ Transfer verified and recorded!");
-            Console.WriteLine($"   Ingredient: {ingredient.IngredientCode}");
-            Console.WriteLine($"   Target: {ingredient.TargetWeight:F3} kg");
-            Console.WriteLine($"   Actual Net: {_activeSession.NetIngredientWeight:F3} kg");
-            Console.WriteLine($"   Scale 2 Cumulative: {actualScale2Net:F3} kg");
-            Console.WriteLine($"   Within Tolerance: {transferRecord.IsWithinTolerance}");
+            _logger.LogInformation("Transfer verified - Ingredient: {IngredientCode}, Target: {Target:F3} kg, Actual: {Actual:F3} kg, Within Tolerance: {WithinTolerance}",
+                ingredient.IngredientCode, ingredient.TargetWeight, _activeSession.NetIngredientWeight, transferRecord.IsWithinTolerance);
 
-            // ✅ STEP 9: Move to next ingredient
             _activeSession.CurrentIngredientIndex++;
 
-            // ✅ STEP 10: Check if all ingredients for this repetition are complete
             if (_activeSession.CurrentIngredientIndex >= _activeSession.Ingredients.Count)
             {
-                // All ingredients complete for this repetition
                 await CompleteRepetitionAsync(batchId);
 
-                // Check if all repetitions complete
                 if (_activeSession == null)
                 {
-                    // Batch completed
                     return (true, "Batch completed!", deviation);
                 }
 
-                // More repetitions to do
                 return (true, $"Repetition {_activeSession.CurrentRepetition - 1} complete! Starting repetition {_activeSession.CurrentRepetition}", deviation);
             }
 
-            // ✅ NOT LAST INGREDIENT - Just reset ingredient bowl, mixing bowl stays
-            Console.WriteLine($"➡️ Moving to next ingredient: {_activeSession.CurrentIngredient?.IngredientCode}");
+            _logger.LogInformation("Moving to next ingredient: {IngredientCode}", _activeSession.CurrentIngredient?.IngredientCode);
             _activeSession.CurrentStage = WeighingStage.PlaceBowls;
 
-            // Only reset INGREDIENT bowl
             _activeSession.SelectedIngredientBowlCode = null;
             _activeSession.SelectedIngredientBowlWeight = 0;
             _activeSession.IngredientBowlWeight = 0;
@@ -327,41 +355,40 @@ namespace FirstWeigh.Services
             if (ingredient == null)
                 return false;
 
-            // This is called when ingredient weighing is complete
-            // The actual saving happens in ConfirmTransferAsync
             return true;
         }
 
         public async Task<bool> CompleteRepetitionAsync(string batchId)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("CompleteRepetition failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
-            Console.WriteLine($"✅ Repetition {_activeSession.CurrentRepetition} complete!");
+            _logger.LogInformation("Repetition {CurrentRep} of {TotalReps} complete for batch {BatchId}",
+                _activeSession.CurrentRepetition, _activeSession.TotalRepetitions, batchId);
 
-            // Update batch progress
             await _batchService.UpdateRepetitionProgressAsync(
                 batchId,
                 _activeSession.CurrentRepetition
             );
 
-            // ✅ CHECK COMPLETION BEFORE INCREMENTING
             if (_activeSession.CurrentRepetition >= _activeSession.TotalRepetitions)
             {
-                // ✅ ALL REPETITIONS COMPLETE - Batch done!
-                Console.WriteLine($"🎉 All {_activeSession.TotalRepetitions} repetitions complete! Batch finished!");
+                _logger.LogInformation("All {TotalReps} repetitions complete - Batch {BatchId} finished!",
+                    _activeSession.TotalRepetitions, batchId);
                 await CompleteBatchAsync(batchId);
                 return true;
             }
 
-            // ✅ MORE REPETITIONS TO DO - Move to next repetition
             _activeSession.CurrentRepetition++;
-            Console.WriteLine($"🔄 Starting repetition {_activeSession.CurrentRepetition} of {_activeSession.TotalRepetitions}");
+            _logger.LogInformation("Starting repetition {CurrentRep} of {TotalReps}",
+                _activeSession.CurrentRepetition, _activeSession.TotalRepetitions);
 
             _activeSession.CurrentIngredientIndex = 0;
             _activeSession.CurrentStage = WeighingStage.PlaceBowls;
 
-            // ✅ RESET BOTH BOWLS for next repetition
             _activeSession.SelectedIngredientBowlCode = null;
             _activeSession.SelectedIngredientBowlWeight = 0;
             _activeSession.SelectedMixingBowlCode = null;
@@ -376,18 +403,18 @@ namespace FirstWeigh.Services
         public async Task<bool> CompleteBatchAsync(string batchId)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("CompleteBatch failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
-            // ✅ Update WeighingRecord first
             await UpdateWeighingRecordOnCompletion();
 
-            // ✅ DEFENSIVE: Get the most reliable operator name
             string completedByOperator = _activeSession.OperatorName;
 
-            // If session operator is empty, try to get from WeighingRecord
             if (string.IsNullOrEmpty(completedByOperator))
             {
-                Console.WriteLine("⚠️ WARNING: Session operator is empty! Checking WeighingRecord...");
+                _logger.LogWarning("Session operator is empty - Checking WeighingRecord...");
 
                 if (!string.IsNullOrEmpty(_activeSession.WeighingRecordId))
                 {
@@ -395,44 +422,41 @@ namespace FirstWeigh.Services
                     if (record != null && !string.IsNullOrEmpty(record.OperatorName))
                     {
                         completedByOperator = record.OperatorName;
-                        Console.WriteLine($"✅ Using operator from WeighingRecord: {completedByOperator}");
+                        _logger.LogInformation("Using operator from WeighingRecord: {Operator}", completedByOperator);
                     }
                 }
             }
 
-            // If still empty, try to get from batch
             if (string.IsNullOrEmpty(completedByOperator))
             {
-                Console.WriteLine("⚠️ WARNING: Still no operator! Checking Batch.StartedBy...");
+                _logger.LogWarning("Still no operator - Checking Batch.StartedBy...");
                 var batch = await _batchService.GetBatchByIdAsync(batchId);
                 if (batch != null && !string.IsNullOrEmpty(batch.StartedBy))
                 {
                     completedByOperator = batch.StartedBy;
-                    Console.WriteLine($"✅ Using operator from Batch.StartedBy: {completedByOperator}");
+                    _logger.LogInformation("Using operator from Batch.StartedBy: {Operator}", completedByOperator);
                 }
             }
 
-            // Final fallback
             if (string.IsNullOrEmpty(completedByOperator))
             {
                 completedByOperator = "Unknown Operator";
-                Console.WriteLine("❌ ERROR: No operator found anywhere! Using fallback.");
+                _logger.LogError("No operator found anywhere - Using fallback");
             }
 
-            Console.WriteLine($"🎯 Completing batch {batchId} with operator: {completedByOperator}");
+            _logger.LogInformation("Completing batch {BatchId} with operator: {Operator}", batchId, completedByOperator);
 
-            // ✅ Complete batch with the operator name
             await _batchService.CompleteBatchAsync(batchId, completedByOperator);
 
-            // Clear session
             _activeSession = null;
 
-            Console.WriteLine($"🎉 Batch {batchId} completed successfully by {completedByOperator}!");
+            _logger.LogInformation("Batch {BatchId} completed successfully by {Operator}", batchId, completedByOperator);
             return true;
         }
 
         public Task<bool> PauseSessionAsync(string batchId)
         {
+            _logger.LogInformation("Pausing session for batch {BatchId}", batchId);
             _activeSession = null;
             return Task.FromResult(true);
         }
@@ -440,9 +464,13 @@ namespace FirstWeigh.Services
         public async Task<bool> AbortSessionAsync(string batchId, string reason, string abortedBy)
         {
             if (_activeSession == null || _activeSession.BatchId != batchId)
+            {
+                _logger.LogWarning("AbortSession failed - No active session for batch {BatchId}", batchId);
                 return false;
+            }
 
-            // ✅ Update WeighingRecord as aborted
+            _logger.LogWarning("Aborting batch {BatchId} - Reason: {Reason}, By: {AbortedBy}", batchId, reason, abortedBy);
+
             if (!string.IsNullOrEmpty(_activeSession.WeighingRecordId))
             {
                 var record = await _reportService.GetWeighingRecordByIdAsync(_activeSession.WeighingRecordId);
@@ -472,10 +500,10 @@ namespace FirstWeigh.Services
 
         public void ClearActiveSession()
         {
+            _logger.LogInformation("Clearing active session");
             _activeSession = null;
         }
 
-        // ✅ NEW: Cumulative Tolerance Report
         public (bool withinTolerance, string report, decimal overallDeviation) GetCumulativeToleranceReport()
         {
             if (_activeSession == null)
@@ -523,7 +551,6 @@ namespace FirstWeigh.Services
                     outOfToleranceCount++;
                 }
 
-                // Format the line
                 var statusIcon = withinTolerance ? "✓" : "⚠️";
                 var deviationSign = deviation >= 0 ? "+" : "";
 
@@ -599,16 +626,12 @@ namespace FirstWeigh.Services
             return BASE_TRANSFER_TOLERANCE + (PER_INGREDIENT_TOLERANCE * ingredientsTransferred);
         }
 
-        // Helper method kept for compatibility
         public (string statusColor, string statusIcon, string statusMessage, bool canComplete)
             GetIngredientStatus(decimal currentWeight, RecipeIngredient ingredient)
         {
-            // This uses absolute weight from scale (not net)
-            // Keeping for any legacy code that might use it
             return GetIngredientStatusByNet(currentWeight, ingredient);
         }
 
-        // ✅ PRIVATE: Generate unique record ID
         private async Task<string> GenerateRecordIdAsync()
         {
             var allRecords = await _reportService.GetAllWeighingRecordsAsync();
@@ -626,7 +649,6 @@ namespace FirstWeigh.Services
             return $"RECORD{(maxId + 1):D3}";
         }
 
-        // ✅ PRIVATE: Save WeighingDetail
         private async Task SaveWeighingDetailAsync(TransferredIngredient transfer)
         {
             if (_activeSession == null || string.IsNullOrEmpty(_activeSession.WeighingRecordId))
@@ -652,17 +674,15 @@ namespace FirstWeigh.Services
                 ScaleNumber = 1,
                 Unit = "kg",
                 Timestamp = transfer.TransferredAt,
-                // ✅ NEW: Add Scale 2 tracking data
                 Scale2WeightBefore = transfer.Scale2WeightBefore,
                 Scale2WeightAfter = transfer.Scale2WeightAfter,
                 TransferDeviation = transfer.TransferDeviation
             };
 
             await _reportService.SaveWeighingDetailAsync(detail);
-            Console.WriteLine($"✅ WeighingDetail saved: {detail.DetailId}");
+            _logger.LogDebug("WeighingDetail saved: {DetailId}", detail.DetailId);
         }
 
-        // ✅ PRIVATE: Generate unique detail ID
         private async Task<string> GenerateDetailIdAsync()
         {
             if (string.IsNullOrEmpty(_activeSession?.WeighingRecordId))
@@ -683,7 +703,6 @@ namespace FirstWeigh.Services
             return $"DETAIL{(maxId + 1):D4}";
         }
 
-        // ✅ PRIVATE: Update WeighingRecord on completion
         private async Task UpdateWeighingRecordOnCompletion()
         {
             if (_activeSession == null || string.IsNullOrEmpty(_activeSession.WeighingRecordId))
@@ -693,7 +712,6 @@ namespace FirstWeigh.Services
             if (record == null)
                 return;
 
-            // Calculate statistics
             var allDetails = await _reportService.GetWeighingDetailsByRecordIdAsync(_activeSession.WeighingRecordId);
 
             record.SessionEndTime = DateTime.Now;
@@ -710,7 +728,8 @@ namespace FirstWeigh.Services
             }
 
             await _reportService.UpdateWeighingRecordAsync(record);
-            Console.WriteLine($"✅ WeighingRecord updated: {record.RecordId}");
+            _logger.LogInformation("WeighingRecord {RecordId} updated - Status: {Status}, Compliance: {Compliance:F1}%",
+                record.RecordId, record.Status, record.CompliancePercentage);
         }
     }
 }

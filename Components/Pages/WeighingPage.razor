@@ -1155,7 +1155,8 @@
             return;
         }
 
-        var result = WeighingService.VerifyBowlWeight(scale1Weight, selectedIngredientBowlWeight, selectedIngredientBowlCode, 0.05m);
+        // REPLACE WITH:
+        var result = WeighingService.VerifyBowlWeight(scale1Weight, selectedIngredientBowlWeight, selectedIngredientBowlCode);
 
         if (result.isValid)
         {
@@ -1177,7 +1178,8 @@
             return;
         }
 
-        var result = WeighingService.VerifyBowlWeight(scale2Weight, selectedMixingBowlWeight, selectedMixingBowlCode, 0.05m);
+        // REPLACE WITH:
+        var result = WeighingService.VerifyBowlWeight(scale2Weight, selectedMixingBowlWeight, selectedMixingBowlCode);
 
         if (result.isValid)
         {
